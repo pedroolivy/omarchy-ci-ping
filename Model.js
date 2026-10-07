@@ -6,9 +6,13 @@ var PULLS_URL = "https://github.com/pulls"
 var MAX_PINGS_PER_POLL = 3
 var PR_URL = /^https:\/\/github\.com\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+\/pull\/\d+$/
 
-var QUERY = "query{viewer{pullRequests(first:100,states:OPEN,orderBy:{field:UPDATED_AT,direction:DESC})"
+var QUERY = "query{viewer{"
+  + "open:pullRequests(first:100,states:OPEN,orderBy:{field:UPDATED_AT,direction:DESC})"
   + "{nodes{number title url isDraft baseRefName repository{nameWithOwner}"
-  + " commits(last:1){nodes{commit{oid statusCheckRollup{state}}}}}}}}"
+  + " commits(last:1){nodes{commit{oid statusCheckRollup{state}}}}}}"
+  + " merged:pullRequests(first:50,states:MERGED,orderBy:{field:UPDATED_AT,direction:DESC})"
+  + "{nodes{number title url mergedAt baseRefName repository{nameWithOwner}}}"
+  + "}}"
 
 function clampPollSeconds(value) {
   var seconds = Math.round(Number(value))
@@ -33,8 +37,8 @@ function ciState(rollup) {
 
 function parsePulls(text) {
   var data = JSON.parse(text)
-  var nodes = data && data.data && data.data.viewer && data.data.viewer.pullRequests
-    ? data.data.viewer.pullRequests.nodes : null
+  var nodes = data && data.data && data.data.viewer && data.data.viewer.open
+    ? data.data.viewer.open.nodes : null
   if (!Array.isArray(nodes)) throw new Error("unexpected answer from GitHub")
   var pulls = []
   for (var i = 0; i < nodes.length; i++) {
@@ -134,6 +138,7 @@ var CI_MARK = { failed: "", running: "", passed: "", none: "" }
 var CI_LABEL = { failed: "Failed", running: "Running", passed: "Passed", none: "No CI" }
 var PULL_ICON_OPEN = ""
 var PULL_ICON_DRAFT = ""
+var PULL_ICON_MERGED = "\uf419"
 
 function pullIcon(pull) {
   return pull.draft ? PULL_ICON_DRAFT : PULL_ICON_OPEN
@@ -168,4 +173,93 @@ function themePalette(colorsToml) {
 
 function openUrl(pull) {
   return pull && pull.url ? pull.url : PULLS_URL
+}
+
+var MERGED_WINDOW_MS = 24 * 60 * 60 * 1000
+
+function parseMerged(text, nowMs) {
+  var data
+  try {
+    data = JSON.parse(text)
+  } catch (parseError) {
+    return []
+  }
+  var nodes = data && data.data && data.data.viewer && data.data.viewer.merged
+    ? data.data.viewer.merged.nodes : null
+  if (!Array.isArray(nodes)) return []
+  var merged = []
+  for (var i = 0; i < nodes.length; i++) {
+    var node = nodes[i]
+    if (!node || !node.repository) continue
+    var mergedMs = Date.parse(String(node.mergedAt || ""))
+    if (!isFinite(mergedMs) || nowMs - mergedMs > MERGED_WINDOW_MS) continue
+    var repo = String(node.repository.nameWithOwner)
+    merged.push({
+      key: repo + "#" + node.number,
+      repo: repo,
+      number: node.number,
+      title: String(node.title || ""),
+      url: PR_URL.test(String(node.url || "")) ? String(node.url) : "",
+      base: String(node.baseRefName || ""),
+      mergedMs: mergedMs
+    })
+  }
+  return merged.sort(function(a, b) { return b.mergedMs - a.mergedMs })
+}
+
+function dismissedList(value) {
+  var items = Array.isArray(value) ? value : (value ? [value] : [])
+  var entries = []
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i]
+    if (typeof item === "string" && item !== "") entries.push({ key: item, mergedMs: null })
+    else if (item && typeof item.key === "string" && item.key !== "" && isFinite(item.mergedMs)) entries.push({ key: item.key, mergedMs: Number(item.mergedMs) })
+  }
+  return entries
+}
+
+function isDismissed(dismissed, key) {
+  for (var i = 0; i < dismissed.length; i++) if (dismissed[i].key === key) return true
+  return false
+}
+
+function withinWindow(merged, nowMs) {
+  return merged.filter(function(pull) { return nowMs - pull.mergedMs <= MERGED_WINDOW_MS })
+}
+
+function visibleMerged(merged, dismissedValue, nowMs) {
+  var dismissed = dismissedList(dismissedValue)
+  return withinWindow(merged, nowMs).filter(function(pull) { return !isDismissed(dismissed, pull.key) })
+}
+
+function keepDismissed(dismissedValue, merged, pullsToDismiss, nowMs) {
+  var mergedKeys = merged.map(function(pull) { return pull.key })
+  var kept = dismissedList(dismissedValue).filter(function(entry) {
+    if (entry.mergedMs === null) return mergedKeys.indexOf(entry.key) !== -1
+    return nowMs - entry.mergedMs <= MERGED_WINDOW_MS
+  })
+  for (var i = 0; i < pullsToDismiss.length; i++) {
+    var pull = pullsToDismiss[i]
+    if (!isDismissed(kept, pull.key)) kept.push({ key: pull.key, mergedMs: pull.mergedMs })
+  }
+  return kept
+}
+
+function timeAgo(thenMs, nowMs) {
+  var minutes = Math.floor(Math.max(0, nowMs - thenMs) / 60000)
+  if (minutes < 1) return "just now"
+  if (minutes < 60) return minutes + " min ago"
+  return Math.floor(minutes / 60) + " h ago"
+}
+
+function mergedSubtitle(pull, nowMs) {
+  return pull.repo + " #" + pull.number + " \u00b7 merged" + (pull.base ? " into " + pull.base : "") + " \u00b7 " + timeAgo(pull.mergedMs, nowMs)
+}
+
+function panelRows(openPulls, merged, dismissedValue, nowMs) {
+  var rows = sortForPanel(openPulls).map(function(pull) { return { kind: "open", pull: pull } })
+  var shown = visibleMerged(merged, dismissedValue, nowMs)
+  if (shown.length > 0) rows.push({ kind: "header", pull: null })
+  for (var i = 0; i < shown.length; i++) rows.push({ kind: "merged", pull: shown[i] })
+  return rows
 }

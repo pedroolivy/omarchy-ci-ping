@@ -27,12 +27,15 @@ Item {
   property string status: "loading"
   property string errorText: ""
   property var pulls: []
+  property var merged: []
   property var counts: Model.countByState([])
   property double lastUpdateMs: 0
+  property double nowMs: Date.now()
 
   property var previousSnapshot: null
 
   function refresh() {
+    root.nowMs = Date.now()
     if (!poll.running) poll.running = true
   }
 
@@ -52,6 +55,7 @@ Item {
     for (var i = 0; i < pings.length; i++) root.sendPing(pings[i])
     root.previousSnapshot = Model.snapshot(freshPulls, root.previousSnapshot)
     root.pulls = freshPulls
+    root.merged = Model.parseMerged(answerText, Date.now())
     root.counts = Model.countByState(freshPulls)
     root.lastUpdateMs = Date.now()
     root.status = partialErrorText ? "partial" : "ok"
