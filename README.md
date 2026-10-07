@@ -19,6 +19,8 @@ starts, passes or fails on any of your open pull requests.
   all of them with Clear.
 - **Pin it.** Pin the panel to keep your pull requests on screen while you
   work; it keeps updating. Click Pinned or the bar icon to let it go.
+- **Starts with your session.** Once it is in the bar, Omarchy loads it at
+  every login. Nothing else to set up.
 - **Quiet when you want.** The bell at the top of the panel turns the pings
   off; the panel keeps tracking everything.
 
