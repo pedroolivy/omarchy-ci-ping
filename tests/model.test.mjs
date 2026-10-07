@@ -285,6 +285,18 @@ test("time ago reads in minutes, then hours", () => {
   assert.equal(M.timeAgo(NOW - 23.9 * HOUR, NOW), "23 h ago")
 })
 
+test("the avatar is a GitHub avatar address, or nothing", () => {
+  const viewer = (login, avatarUrl) => JSON.stringify({ data: { viewer: { login, avatarUrl, open: { nodes: [] } } } })
+  assert.deepEqual({ ...M.parseViewer(viewer("pedroolivy", "https://avatars.githubusercontent.com/u/1?s=64&v=4")) },
+    { login: "pedroolivy", avatarUrl: "https://avatars.githubusercontent.com/u/1?s=64&v=4" })
+  for (const bad of ["http://avatars.githubusercontent.com/u/1", "https://evil.example/u/1.png", "file:///etc/passwd",
+    "https://avatars.githubusercontent.com.evil.example/u/1", "https://avatars.githubusercontent.com/u/1 x", ""]) {
+    assert.equal(M.parseViewer(viewer("pedroolivy", bad)).avatarUrl, "", bad)
+  }
+  assert.equal(M.parseViewer(viewer("-bad", "")).login, "")
+  assert.deepEqual({ ...M.parseViewer("not json") }, { login: "", avatarUrl: "" })
+})
+
 test("poll interval is clamped to 30..900 seconds", () => {
   assert.equal(M.clampPollSeconds(5), 30)
   assert.equal(M.clampPollSeconds(60), 60)
