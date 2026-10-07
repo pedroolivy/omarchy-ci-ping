@@ -107,10 +107,18 @@ test("a push while CI runs starts again for the new commit", () => {
   assert.deepEqual(s.events, ["started me/app#1"])
 })
 
-test("a new PR with CI running is announced; one with an old result is not", () => {
+test("a PR opened after start is announced, running or already finished", () => {
   let s = step(null, [])
-  s = step(s.next, [["me/app", 3, "c", "PENDING"], ["me/lib", 9, "d", "SUCCESS"]])
-  assert.deepEqual(s.events, ["started me/app#3"])
+  s = step(s.next, [["me/app", 3, "c", "PENDING"], ["me/lib", 9, "d", "SUCCESS"], ["me/cli", 4, "e", "FAILURE"]])
+  assert.deepEqual(s.events, ["started me/app#3", "passed me/lib#9", "failed me/cli#4"])
+})
+
+test("CI faster than one poll on a new PR still pings its result once", () => {
+  let s = step(null, [["work/api", 4, "a", null]])
+  s = step(s.next, [["work/api", 4, "a", null], ["me/plugin", 1, "f", "SUCCESS"]])
+  assert.deepEqual(s.events, ["passed me/plugin#1"])
+  s = step(s.next, [["work/api", 4, "a", null], ["me/plugin", 1, "f", "SUCCESS"]])
+  assert.deepEqual(s.events, [])
 })
 
 test("a PR without CI never notifies", () => {

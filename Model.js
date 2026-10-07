@@ -74,7 +74,7 @@ function changes(previous, pulls) {
     if (pull.ci === "running") {
       if (!sameCommit || before.ci !== "running") events.push({ kind: "started", pull: pull })
     } else if (pull.ci === "passed" || pull.ci === "failed") {
-      if (before !== null && (!sameCommit || before.ci !== pull.ci)) events.push({ kind: pull.ci, pull: pull })
+      if (!sameCommit || before.ci !== pull.ci) events.push({ kind: pull.ci, pull: pull })
     }
   }
   return events
