@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
@@ -68,6 +69,7 @@ Panel {
     return text
   }
 
+  readonly property string avatarUrl: service && service.viewer ? service.viewer.avatarUrl : ""
   readonly property bool pingsOn: root.setting("notify", true) !== false
 
   function togglePings() {
@@ -292,6 +294,50 @@ Panel {
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
               onClicked: root.togglePings()
+            }
+          }
+
+          Item {
+            id: avatar
+            visible: root.avatarUrl !== "" && avatarImage.status === Image.Ready
+            anchors.verticalCenter: parent.verticalCenter
+            width: pingsToggle.height
+            height: pingsToggle.height
+
+            Rectangle {
+              id: avatarMask
+              anchors.fill: parent
+              radius: width / 2
+              color: "white"
+              visible: false
+              layer.enabled: true
+            }
+
+            Image {
+              id: avatarImage
+              anchors.fill: parent
+              source: root.avatarUrl
+              sourceSize.width: 64
+              sourceSize.height: 64
+              fillMode: Image.PreserveAspectCrop
+              asynchronous: true
+              smooth: true
+              layer.enabled: true
+              layer.smooth: true
+              layer.effect: MultiEffect {
+                maskEnabled: true
+                maskSource: avatarMask
+                maskThresholdMin: 0.5
+                maskSpreadAtMin: 1.0
+              }
+            }
+
+            Rectangle {
+              anchors.fill: parent
+              radius: width / 2
+              color: "transparent"
+              border.width: 1
+              border.color: Util.alpha(Color.popups.text, 0.25)
             }
           }
         }
