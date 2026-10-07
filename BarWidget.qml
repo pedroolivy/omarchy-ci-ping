@@ -69,7 +69,34 @@ Panel {
     return text
   }
 
-  readonly property string projectUrl: Model.repositoryUrl(service ? service.manifest : null)
+  readonly property string projectUrl: service ? service.projectUrl : ""
+  property string starPhase: "idle"
+
+  function giveStar() {
+    if (!root.service || root.starPhase !== "idle") return
+    root.starPhase = "sending"
+    if (!root.service.starProject()) {
+      root.starPhase = "idle"
+      root.openLink(root.projectUrl)
+    }
+  }
+
+  Connections {
+    target: root.service
+    function onProjectStarredChanged() {
+      if (root.service.projectStarred === false && root.starPhase === "done") root.starPhase = "idle"
+    }
+    function onStarFinished(starred) {
+      if (root.starPhase !== "sending") return
+      if (starred) {
+        root.starPhase = "thanks"
+        thanksAnimation.restart()
+      } else {
+        root.starPhase = "idle"
+        root.openLink(root.projectUrl)
+      }
+    }
+  }
   readonly property string avatarUrl: service && service.viewer ? service.viewer.avatarUrl : ""
   readonly property bool pingsOn: root.setting("notify", true) !== false
 
@@ -570,24 +597,132 @@ Panel {
           font.pixelSize: Style.font.caption
         }
 
-        Text {
-          id: starProject
-          visible: root.projectUrl !== ""
+        Item {
+          id: starArea
+          property real sparkProgress: 0
+          visible: root.projectUrl !== "" && (root.starPhase === "sending" || root.starPhase === "thanks"
+            || (root.starPhase === "idle" && root.service !== null && root.service.projectStarred === false))
           anchors.horizontalCenter: parent.horizontalCenter
           anchors.verticalCenter: parent.verticalCenter
-          textFormat: Text.PlainText
-          text: "\uf005 Star"
-          color: starHover.hovered ? root.yellow : Color.muted
-          font.family: Style.font.family
-          font.pixelSize: Style.font.caption
+          width: Math.max(starButton.implicitWidth, thanksRow.implicitWidth)
+          height: Math.max(starButton.implicitHeight, thanksRow.implicitHeight)
 
-          HoverHandler {
-            id: starHover
-            cursorShape: Qt.PointingHandCursor
+          Text {
+            id: starButton
+            visible: root.starPhase === "idle" || root.starPhase === "sending"
+            anchors.centerIn: parent
+            textFormat: Text.PlainText
+            text: root.starPhase === "sending" ? " Starring…" : " Star on GitHub"
+            color: starHover.hovered && root.starPhase === "idle" ? root.yellow : Color.muted
+            opacity: root.starPhase === "sending" ? 0.6 : 1
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
+
+            HoverHandler {
+              id: starHover
+              cursorShape: root.starPhase === "idle" ? Qt.PointingHandCursor : Qt.ArrowCursor
+            }
+
+            TapHandler {
+              enabled: root.starPhase === "idle"
+              onTapped: root.giveStar()
+            }
           }
 
-          TapHandler {
-            onTapped: root.openLink(root.projectUrl)
+          Row {
+            id: thanksRow
+            visible: root.starPhase === "thanks"
+            anchors.centerIn: parent
+            spacing: Style.space(6)
+            opacity: 0
+
+            Text {
+              id: thanksStar
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: ""
+              color: root.yellow
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+              scale: 0
+              rotation: -120
+            }
+
+            Text {
+              id: thanksText
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: "Thanks for the star!"
+              color: Color.popups.text
+              font.family: Style.font.family
+              font.pixelSize: Style.font.caption
+              opacity: 0
+            }
+
+            Text {
+              id: thanksHeart
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: ""
+              color: root.red
+              font.family: Style.font.family
+              font.pixelSize: Style.font.caption
+              opacity: 0
+              scale: 0.4
+            }
+          }
+
+          Repeater {
+            model: 8
+
+            Text {
+              required property int index
+              readonly property real angle: index * Math.PI / 4
+              readonly property real centerX: thanksRow.x + thanksStar.x + thanksStar.width / 2
+              readonly property real centerY: thanksRow.y + thanksStar.y + thanksStar.height / 2
+              visible: root.starPhase === "thanks" && starArea.sparkProgress > 0 && starArea.sparkProgress < 1
+              x: centerX + Math.cos(angle) * starArea.sparkProgress * Style.space(18) - width / 2
+              y: centerY + Math.sin(angle) * starArea.sparkProgress * Style.space(18) - height / 2
+              opacity: 1 - starArea.sparkProgress
+              textFormat: Text.PlainText
+              text: ""
+              color: index % 2 === 0 ? root.yellow : Color.popups.text
+              font.family: Style.font.family
+              font.pixelSize: Math.max(6, Style.font.caption - 3)
+            }
+          }
+
+          SequentialAnimation {
+            id: thanksAnimation
+            ScriptAction {
+              script: {
+                thanksRow.opacity = 1
+                thanksStar.scale = 0
+                thanksStar.rotation = -120
+                thanksText.opacity = 0
+                thanksHeart.opacity = 0
+                thanksHeart.scale = 0.4
+                starArea.sparkProgress = 0
+              }
+            }
+            ParallelAnimation {
+              NumberAnimation { target: thanksStar; property: "scale"; to: 1.6; duration: 260; easing.type: Easing.OutBack }
+              NumberAnimation { target: thanksStar; property: "rotation"; to: 0; duration: 420; easing.type: Easing.OutCubic }
+              NumberAnimation { target: starArea; property: "sparkProgress"; from: 0; to: 1; duration: 700; easing.type: Easing.OutCubic }
+              SequentialAnimation {
+                PauseAnimation { duration: 260 }
+                NumberAnimation { target: thanksStar; property: "scale"; to: 1; duration: 200; easing.type: Easing.InOutQuad }
+              }
+            }
+            NumberAnimation { target: thanksText; property: "opacity"; to: 1; duration: 220 }
+            ParallelAnimation {
+              NumberAnimation { target: thanksHeart; property: "opacity"; to: 1; duration: 200 }
+              NumberAnimation { target: thanksHeart; property: "scale"; to: 1.3; duration: 200; easing.type: Easing.OutBack }
+            }
+            NumberAnimation { target: thanksHeart; property: "scale"; to: 1; duration: 160 }
+            PauseAnimation { duration: 2200 }
+            NumberAnimation { target: thanksRow; property: "opacity"; to: 0; duration: 450 }
+            ScriptAction { script: root.starPhase = "done" }
           }
         }
 

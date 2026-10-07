@@ -29,6 +29,10 @@ Item {
   property var pulls: []
   property var merged: []
   property var viewer: Model.parseViewer("")
+  readonly property string projectUrl: Model.repositoryUrl(root.manifest)
+  property var projectStarred: null
+
+  signal starFinished(bool starred)
   property var counts: Model.countByState([])
   property double lastUpdateMs: 0
   property double nowMs: Date.now()
@@ -57,6 +61,8 @@ Item {
     root.previousSnapshot = Model.snapshot(freshPulls, root.previousSnapshot)
     root.pulls = freshPulls
     root.merged = Model.parseMerged(answerText, Date.now())
+    var freshStarred = Model.parseStarred(answerText)
+    if (freshStarred !== null) root.projectStarred = freshStarred
     var freshViewer = Model.parseViewer(answerText)
     if (freshViewer.avatarUrl !== root.viewer.avatarUrl || freshViewer.login !== root.viewer.login) root.viewer = freshViewer
     root.counts = Model.countByState(freshPulls)
@@ -74,7 +80,7 @@ Item {
     id: poll
     command: ["sh", "-c",
               'command -v gh >/dev/null 2>&1 || exit ' + root.ghMissingExitCode + '; exec timeout ' + root.ghTimeoutSeconds + ' gh "$@"',
-              "sh", "api", "graphql", "-f", "query=" + Model.QUERY]
+              "sh", "api", "graphql", "-f", "query=" + Model.buildQuery(root.projectUrl)]
     stdout: StdioCollector { id: pollOut; waitForEnd: true }
     stderr: StdioCollector { id: pollErr; waitForEnd: true }
     onExited: function(exitCode) {
@@ -98,6 +104,24 @@ Item {
           root.errorText = reason
         }
       }
+    }
+  }
+
+  function starProject() {
+    var path = Model.starPath(root.projectUrl)
+    if (path === "" || star.running) return false
+    star.command = ["sh", "-c",
+                    'command -v gh >/dev/null 2>&1 || exit ' + root.ghMissingExitCode + '; exec timeout 20 gh "$@"',
+                    "sh", "api", "--method", "PUT", path, "--silent"]
+    star.running = true
+    return true
+  }
+
+  Process {
+    id: star
+    onExited: function(exitCode) {
+      if (exitCode === 0) root.projectStarred = true
+      root.starFinished(exitCode === 0)
     }
   }
 

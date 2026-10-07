@@ -21,6 +21,9 @@ starts, passes or fails on any of your open pull requests.
   work; it keeps updating. Click Pinned or the bar icon to let it go.
 - **Starts with your session.** Once it is in the bar, Omarchy loads it at
   every login. Nothing else to set up.
+- **Star it in one click.** "Star on GitHub" in the panel footer stars the
+  project with your own `gh` login, only when you click it, then says thanks
+  and goes away. If starring fails, it opens the project page instead.
 - **Quiet when you want.** The bell at the top of the panel turns the pings
   off; the panel keeps tracking everything.
 
@@ -59,7 +62,8 @@ admin of that organization has to allow the GitHub CLI once.
 
 One GraphQL request through `gh api graphql` per poll returns your open PRs
 with the combined check state of each PR's newest commit, the ones merged in
-the last 24 hours, and your login and avatar. The panel loads the avatar from
+the last 24 hours, your login and avatar, and whether you starred the
+project. The panel loads the avatar from
 `avatars.githubusercontent.com`; nothing else leaves your machine. The plugin compares
 it with the previous answer and pings only on a change. A PR without CI never
 pings.
