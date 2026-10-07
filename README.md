@@ -3,7 +3,7 @@
 An [Omarchy](https://omarchy.org) bar widget that pings you on screen when CI
 starts, passes or fails on any of your open pull requests.
 
-![The CI Ping panel next to a failed CI ping](preview.png)
+![The CI Ping panel next to its three pings: CI running, passed and failed](preview.png)
 
 - **Finds your PRs by itself.** Every open PR you authored, in every repo and
   organization your GitHub account can see. No repo list to keep.
