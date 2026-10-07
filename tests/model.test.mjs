@@ -25,7 +25,7 @@ function answer(rows) {
   return JSON.stringify({
     data: { viewer: { open: { nodes: rows.map(([repo, number, sha, rollup]) => ({
       number, title: "PR " + number, url: `https://github.com/${repo}/pull/${number}`, isDraft: false, baseRefName: "main",
-      repository: { nameWithOwner: repo },
+      repository: { nameWithOwner: repo, isPrivate: repo.startsWith("private/") },
       commits: { nodes: sha ? [{ commit: { oid: sha, statusCheckRollup: rollup ? { state: rollup } : null } }] : [] }
     })) } } }
   })
@@ -271,6 +271,13 @@ test("a merged PR leaves the panel after 24 hours even when GitHub stops answeri
   assert.deepEqual([...M.panelRows([], merged, [], NOW + 2 * HOUR)], [])
 })
 
+test("hidden merged PRs stay hidden when settings come back as a list-like object", () => {
+  const merged = M.parseMerged(mergedAnswer([["o/r", 1, 1, "main"], ["o/r", 2, 2, "main"]]), NOW)
+  const listLike = { 0: { key: "o/r#1", mergedMs: merged[0].mergedMs }, length: 1 }
+  assert.deepEqual([...M.visibleMerged(merged, listLike, NOW)].map((p) => p.key), ["o/r#2"])
+  assert.deepEqual([...M.keepDismissed(listLike, merged, [], NOW)].map((d) => d.key), ["o/r#1"])
+})
+
 test("panel rows: open first, then a header and the merged ones still shown", () => {
   const open = step(null, [["o/r", 5, "a", "SUCCESS"], ["o/r", 6, "b", "FAILURE"]]).pulls
   const merged = M.parseMerged(mergedAnswer([["o/r", 1, 1, "main"], ["o/r", 2, 2, "main"]]), NOW)
@@ -357,6 +364,32 @@ test("after failed polls the plugin waits longer, up to 15 minutes", () => {
   assert.equal(M.nextPollSeconds(60, 9), 900)
   assert.equal(M.nextPollSeconds(30, 2), 120)
   assert.equal(M.nextPollSeconds(60, -4), 60)
+})
+
+test("a ping never names a private repository or its pull request", () => {
+  let s = step(null, [["private/secret-app", 9, "a", "PENDING"], ["o/public", 3, "b", "PENDING"]])
+  const pulls = M.parsePulls(answer([["private/secret-app", 9, "a", "FAILURE"], ["o/public", 3, "b", "SUCCESS"]]))
+  const [privatePing, publicPing] = M.notifications(M.changes(s.next, pulls))
+  assert.equal(privatePing.title, "❌ CI failed")
+  assert.ok(!privatePing.body.includes("secret-app") && !privatePing.body.includes("PR 9"), privatePing.body)
+  assert.equal(privatePing.body, M.PRIVATE_PING_BODY)
+  assert.equal(publicPing.body, "o/public #3\nPR 3")
+})
+
+test("a repository with unknown visibility is treated as private", () => {
+  const text = JSON.stringify({ data: { viewer: { open: { nodes: [{ number: 1, title: "t", url: "https://github.com/o/r/pull/1",
+    isDraft: false, baseRefName: "main", repository: { nameWithOwner: "o/r" }, commits: { nodes: [] } }] } } } })
+  assert.equal(M.parsePulls(text)[0].private, true)
+})
+
+test("a pull request link opens through a redirect page, never as a process argument", () => {
+  assert.equal(M.isPullUrl("https://github.com/private/secret-app/pull/9"), true)
+  assert.equal(M.isPullUrl("https://github.com/pulls"), false)
+  assert.equal(M.isPullUrl("https://github.com/pedroolivy/omarchy-ci-ping"), false)
+  const page = M.redirectPage("https://github.com/private/secret-app/pull/9")
+  assert.ok(page.includes('content="0;url=https://github.com/private/secret-app/pull/9"'), page)
+  assert.ok(page.includes('name="referrer" content="no-referrer"'))
+  assert.ok(M.redirectPage('https://evil.example/"><script>').includes("url=https://github.com/pulls"))
 })
 
 test("poll interval is clamped to 30..900 seconds", () => {
