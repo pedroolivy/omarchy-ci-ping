@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  model:
+    name: Model (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node tests/model.test.mjs
+
+  manifest:
+    name: Manifest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: jq -e '.schemaVersion == 1 and .id == "io.github.pedroolivy.ci-ping" and (.kinds | index("service")) and (.kinds | index("bar-widget"))' manifest.json
+      - run: |
+          for entry in $(jq -r '.entryPoints[]' manifest.json); do
+            test -f "$entry" || { echo "::error::missing entry point $entry"; exit 1; }
+          done
