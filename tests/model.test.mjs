@@ -23,7 +23,7 @@ function test(name, fn) {
 
 function answer(rows) {
   return JSON.stringify({
-    data: { viewer: { pullRequests: { nodes: rows.map(([repo, number, sha, rollup]) => ({
+    data: { viewer: { open: { nodes: rows.map(([repo, number, sha, rollup]) => ({
       number, title: "PR " + number, url: `https://github.com/${repo}/pull/${number}`, isDraft: false, baseRefName: "main",
       repository: { nameWithOwner: repo },
       commits: { nodes: sha ? [{ commit: { oid: sha, statusCheckRollup: rollup ? { state: rollup } : null } }] : [] }
@@ -220,6 +220,69 @@ test("pings off sends nothing; started pings can be turned off alone", () => {
   assert.equal(M.pingsToSend(events, false, true).length, 0)
   assert.deepEqual([...M.pingsToSend(events, true, false)].map((p) => p.title), ["\u274c CI failed"])
   assert.equal(M.pingsToSend(events, true, true).length, 2)
+})
+
+const NOW = Date.parse("2026-10-07T20:00:00Z")
+const HOUR = 60 * 60 * 1000
+function mergedAnswer(rows) {
+  return JSON.stringify({ data: { viewer: { open: { nodes: [] }, merged: { nodes: rows.map(([repo, number, hoursAgo, base]) => ({
+    number, title: "Merged " + number, url: `https://github.com/${repo}/pull/${number}`,
+    mergedAt: new Date(NOW - hoursAgo * HOUR).toISOString(), baseRefName: base, repository: { nameWithOwner: repo }
+  })) } } } })
+}
+
+test("merged PRs show for 24 hours, newest first, with the branch they went into", () => {
+  const merged = M.parseMerged(mergedAnswer([["o/r", 1, 25, "main"], ["o/r", 2, 3, "main"], ["o/r", 3, 0.5, "develop"]]), NOW)
+  assert.deepEqual([...merged].map((p) => p.number), [3, 2])
+  assert.equal(M.mergedSubtitle(merged[0], NOW), "o/r #3 \u00b7 merged into develop \u00b7 30 min ago")
+  assert.equal(M.mergedSubtitle(merged[1], NOW), "o/r #2 \u00b7 merged into main \u00b7 3 h ago")
+})
+
+test("a bad merged answer never breaks the open list", () => {
+  assert.deepEqual([...M.parseMerged("not json", NOW)], [])
+  assert.deepEqual([...M.parseMerged(JSON.stringify({ data: { viewer: { open: { nodes: [] } } } }), NOW)], [])
+  const text = mergedAnswer([["o/r", 1, 1, "main"]]).replace("https://github.com/o/r/pull/1", "file:///etc/passwd")
+  assert.equal(M.parseMerged(text, NOW)[0].url, "")
+})
+
+test("a dismissed merged PR leaves the panel and stays hidden until its day is over", () => {
+  const merged = M.parseMerged(mergedAnswer([["o/r", 1, 1, "main"], ["o/r", 2, 2, "main"]]), NOW)
+  let dismissed = M.keepDismissed([], merged, [merged[0]], NOW)
+  assert.deepEqual([...M.visibleMerged(merged, dismissed, NOW)].map((p) => p.key), ["o/r#2"])
+  const onlyTwo = merged.filter((p) => p.key === "o/r#2")
+  dismissed = M.keepDismissed(dismissed, onlyTwo, [onlyTwo[0]], NOW)
+  assert.deepEqual([...dismissed].map((d) => d.key), ["o/r#1", "o/r#2"])
+  assert.deepEqual([...M.visibleMerged(merged, dismissed, NOW)], [])
+  assert.deepEqual([...M.keepDismissed(dismissed, [], [], NOW + 24 * HOUR)].map((d) => d.key), [])
+})
+
+test("dismissed keys saved as one string or with junk still work", () => {
+  const merged = M.parseMerged(mergedAnswer([["o/r", 1, 1, "main"], ["o/r", 2, 2, "main"]]), NOW)
+  assert.deepEqual([...M.visibleMerged(merged, "o/r#1", NOW)].map((p) => p.key), ["o/r#2"])
+  assert.deepEqual([...M.visibleMerged(merged, ["o/r#2", 7, null, "", { key: "o/r#1" }], NOW)].map((p) => p.key), ["o/r#1"])
+  assert.deepEqual([...M.visibleMerged(merged, "", NOW)].map((p) => p.key), ["o/r#1", "o/r#2"])
+  assert.deepEqual([...M.keepDismissed(["o/r#1", "gone/repo#9"], merged, [], NOW)].map((d) => d.key), ["o/r#1"])
+})
+
+test("a merged PR leaves the panel after 24 hours even when GitHub stops answering", () => {
+  const merged = M.parseMerged(mergedAnswer([["o/r", 1, 23, "main"]]), NOW)
+  assert.equal(M.visibleMerged(merged, [], NOW).length, 1)
+  assert.equal(M.visibleMerged(merged, [], NOW + 2 * HOUR).length, 0)
+  assert.deepEqual([...M.panelRows([], merged, [], NOW + 2 * HOUR)], [])
+})
+
+test("panel rows: open first, then a header and the merged ones still shown", () => {
+  const open = step(null, [["o/r", 5, "a", "SUCCESS"], ["o/r", 6, "b", "FAILURE"]]).pulls
+  const merged = M.parseMerged(mergedAnswer([["o/r", 1, 1, "main"], ["o/r", 2, 2, "main"]]), NOW)
+  assert.deepEqual([...M.panelRows(open, merged, ["o/r#2"], NOW)].map((r) => r.kind + (r.pull ? r.pull.number : "")),
+    ["open6", "open5", "header", "merged1"])
+  assert.deepEqual([...M.panelRows(open, merged, ["o/r#1", "o/r#2"], NOW)].map((r) => r.kind), ["open", "open"])
+})
+
+test("time ago reads in minutes, then hours", () => {
+  assert.equal(M.timeAgo(NOW - 20 * 1000, NOW), "just now")
+  assert.equal(M.timeAgo(NOW - 5 * 60 * 1000, NOW), "5 min ago")
+  assert.equal(M.timeAgo(NOW - 23.9 * HOUR, NOW), "23 h ago")
 })
 
 test("poll interval is clamped to 30..900 seconds", () => {
