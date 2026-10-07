@@ -9,6 +9,9 @@ starts, passes or fails on any of your open pull requests.
   organization your GitHub account can see. No repo list to keep.
 - **Three pings.** ⏳ CI running, ✅ CI passed, ❌ CI failed. A failure stays on
   screen until you close it; the others go away on their own.
+- **Private stays private.** A ping for a private repository never names the
+  repository or the pull request; the panel shows which one. Pull request
+  links open through a private file, never as a command-line argument.
 - **Never repeats.** Each result pings once, even with several monitors, and a
   shell restart does not replay old results.
 - **In the bar.** How many PRs you have open, with an hourglass while CI runs
