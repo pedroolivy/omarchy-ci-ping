@@ -1,5 +1,12 @@
 # CI Ping
 
+[![CI](https://github.com/pedroolivy/omarchy-ci-ping/actions/workflows/ci.yml/badge.svg)](https://github.com/pedroolivy/omarchy-ci-ping/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/pedroolivy/omarchy-ci-ping)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/pedroolivy/omarchy-ci-ping)](https://github.com/pedroolivy/omarchy-ci-ping/releases/latest)
+[![Omarchy 4](https://img.shields.io/badge/Omarchy-4-7aa2f7)](https://omarchy.org)
+[![Omarchy marketplace](https://img.shields.io/badge/Omarchy_marketplace-listed-9ece6a)](https://plugins.omarchy.org/plugin.html?id=io.github.pedroolivy.ci-ping)
+[![Conventional Commits](https://img.shields.io/badge/Conventional_Commits-1.0.0-fe5196?logo=conventionalcommits&logoColor=white)](https://www.conventionalcommits.org)
+
 An [Omarchy](https://omarchy.org) bar widget that pings you on screen when CI
 starts, passes or fails on any of your open pull requests.
 
