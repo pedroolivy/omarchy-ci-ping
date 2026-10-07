@@ -9,13 +9,25 @@ var LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/
 var REPO_URL = /^https:\/\/github\.com\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/
 var PR_URL = /^https:\/\/github\.com\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+\/pull\/\d+$/
 
-var QUERY = "query{viewer{login avatarUrl(size:64) "
+var VIEWER_FIELDS = "login avatarUrl(size:64) "
   + "open:pullRequests(first:100,states:OPEN,orderBy:{field:UPDATED_AT,direction:DESC})"
   + "{nodes{number title url isDraft baseRefName repository{nameWithOwner}"
   + " commits(last:1){nodes{commit{oid statusCheckRollup{state}}}}}}"
   + " merged:pullRequests(first:50,states:MERGED,orderBy:{field:UPDATED_AT,direction:DESC})"
   + "{nodes{number title url mergedAt baseRefName repository{nameWithOwner}}}"
-  + "}}"
+
+function repoParts(projectUrl) {
+  var match = String(projectUrl || "").match(/^https:\/\/github\.com\/([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+)$/)
+  return match ? { owner: match[1], name: match[2] } : null
+}
+
+function buildQuery(projectUrl) {
+  var parts = repoParts(projectUrl)
+  var project = parts ? " project:repository(owner:\"" + parts.owner + "\",name:\"" + parts.name + "\"){viewerHasStarred}" : ""
+  return "query{viewer{" + VIEWER_FIELDS + "}" + project + "}"
+}
+
+var QUERY = buildQuery("")
 
 function clampPollSeconds(value) {
   var seconds = Math.round(Number(value))
@@ -287,4 +299,20 @@ function repositoryUrl(manifest) {
   var url = manifest ? String(manifest.repository || manifest.homepage || "") : ""
   url = url.replace(/\.git$/, "").replace(/\/$/, "")
   return REPO_URL.test(url) ? url : ""
+}
+
+function parseStarred(text) {
+  var data
+  try {
+    data = JSON.parse(text)
+  } catch (parseError) {
+    return null
+  }
+  var project = data && data.data ? data.data.project : null
+  return project && typeof project.viewerHasStarred === "boolean" ? project.viewerHasStarred : null
+}
+
+function starPath(projectUrl) {
+  var parts = repoParts(projectUrl)
+  return parts ? "/user/starred/" + parts.owner + "/" + parts.name : ""
 }
