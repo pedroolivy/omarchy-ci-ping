@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
@@ -60,12 +61,27 @@ Panel {
     return lines.join("\n")
   }
 
-  function stateColor(ci) {
-    if (ci === "failed") return Color.urgent
-    if (ci === "running") return Color.accent
-    if (ci === "passed") return Color.popups.text
+  property var palette: Model.themePalette("")
+  readonly property color green: palette.green || Color.popups.text
+  readonly property color red: palette.red || Color.urgent
+  readonly property color yellow: palette.yellow || Color.accent
+
+  FileView {
+    path: Color.currentThemePath + "/colors.toml"
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.palette = Model.themePalette(text())
+    onFileChanged: reload()
+  }
+
+  function ciColor(ci) {
+    if (ci === "failed") return root.red
+    if (ci === "running") return root.yellow
+    if (ci === "passed") return root.green
     return Color.muted
   }
+
+  onOpenedChanged: if (opened && service) service.refresh()
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -180,8 +196,8 @@ Panel {
             width: Style.space(20)
             horizontalAlignment: Text.AlignHCenter
             textFormat: Text.PlainText
-            text: Model.STATE_ICON[row.modelData.ci]
-            color: root.stateColor(row.modelData.ci)
+            text: Model.pullIcon(row.modelData)
+            color: row.modelData.draft ? Color.muted : root.green
             font.family: Style.font.family
             font.pixelSize: Style.font.iconLarge
           }
@@ -190,7 +206,7 @@ Panel {
             id: rowText
             anchors.left: rowIcon.right
             anchors.leftMargin: Style.space(10)
-            anchors.right: rowOpen.left
+            anchors.right: ciBadge.left
             anchors.rightMargin: Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(2)
@@ -209,26 +225,38 @@ Panel {
               width: parent.width
               elide: Text.ElideRight
               textFormat: Text.PlainText
-              text: row.modelData.repo + " #" + row.modelData.number
-                + "  ·  " + Model.STATE_TEXT[row.modelData.ci]
-                + (row.modelData.draft ? "  ·  draft" : "")
+              text: Model.pullSubtitle(row.modelData)
               color: Color.muted
               font.family: Style.font.family
               font.pixelSize: Style.font.caption
             }
           }
 
-          Text {
-            id: rowOpen
+          Row {
+            id: ciBadge
             anchors.right: parent.right
             anchors.rightMargin: Style.space(10)
             anchors.verticalCenter: parent.verticalCenter
-            textFormat: Text.PlainText
-            text: ""
-            opacity: rowHover.hovered ? 1 : 0
-            color: Color.muted
-            font.family: Style.font.family
-            font.pixelSize: Style.font.body
+            spacing: Style.space(6)
+
+            Text {
+              visible: text !== ""
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: Model.CI_MARK[row.modelData.ci]
+              color: root.ciColor(row.modelData.ci)
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+            }
+
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: Model.CI_LABEL[row.modelData.ci]
+              color: root.ciColor(row.modelData.ci)
+              font.family: Style.font.family
+              font.pixelSize: Style.font.caption
+            }
           }
 
           HoverHandler {
