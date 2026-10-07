@@ -6,6 +6,7 @@ var PULLS_URL = "https://github.com/pulls"
 var MAX_PINGS_PER_POLL = 3
 var AVATAR_URL = /^https:\/\/avatars\.githubusercontent\.com\/[A-Za-z0-9\/._~?=&%-]+$/
 var LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/
+var REPO_URL = /^https:\/\/github\.com\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/
 var PR_URL = /^https:\/\/github\.com\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+\/pull\/\d+$/
 
 var QUERY = "query{viewer{login avatarUrl(size:64) "
@@ -280,4 +281,10 @@ function parseViewer(text) {
     login: LOGIN.test(login) ? login : "",
     avatarUrl: AVATAR_URL.test(avatarUrl) ? avatarUrl : ""
   }
+}
+
+function repositoryUrl(manifest) {
+  var url = manifest ? String(manifest.repository || manifest.homepage || "") : ""
+  url = url.replace(/\.git$/, "").replace(/\/$/, "")
+  return REPO_URL.test(url) ? url : ""
 }

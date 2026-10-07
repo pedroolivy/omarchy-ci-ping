@@ -297,6 +297,16 @@ test("the avatar is a GitHub avatar address, or nothing", () => {
   assert.deepEqual({ ...M.parseViewer("not json") }, { login: "", avatarUrl: "" })
 })
 
+test("the star link points at the plugin's own GitHub repository, or is hidden", () => {
+  assert.equal(M.repositoryUrl({ repository: "https://github.com/pedroolivy/omarchy-ci-ping" }), "https://github.com/pedroolivy/omarchy-ci-ping")
+  assert.equal(M.repositoryUrl({ repository: "https://github.com/someone/fork.git" }), "https://github.com/someone/fork")
+  assert.equal(M.repositoryUrl({ homepage: "https://github.com/a/b/" }), "https://github.com/a/b")
+  for (const bad of ["https://evil.example/a/b", "file:///etc", "https://github.com/a", "https://github.com/a/b/c", ""]) {
+    assert.equal(M.repositoryUrl({ repository: bad }), "", bad)
+  }
+  assert.equal(M.repositoryUrl(null), "")
+})
+
 test("poll interval is clamped to 30..900 seconds", () => {
   assert.equal(M.clampPollSeconds(5), 30)
   assert.equal(M.clampPollSeconds(60), 60)

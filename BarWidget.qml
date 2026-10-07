@@ -69,6 +69,7 @@ Panel {
     return text
   }
 
+  readonly property string projectUrl: Model.repositoryUrl(service ? service.manifest : null)
   readonly property string avatarUrl: service && service.viewer ? service.viewer.avatarUrl : ""
   readonly property bool pingsOn: root.setting("notify", true) !== false
 
@@ -567,6 +568,27 @@ Panel {
           color: Color.muted
           font.family: Style.font.family
           font.pixelSize: Style.font.caption
+        }
+
+        Text {
+          id: starProject
+          visible: root.projectUrl !== ""
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.verticalCenter: parent.verticalCenter
+          textFormat: Text.PlainText
+          text: "\uf005 Star"
+          color: starHover.hovered ? root.yellow : Color.muted
+          font.family: Style.font.family
+          font.pixelSize: Style.font.caption
+
+          HoverHandler {
+            id: starHover
+            cursorShape: Qt.PointingHandCursor
+          }
+
+          TapHandler {
+            onTapped: root.openLink(root.projectUrl)
+          }
         }
 
         Text {
