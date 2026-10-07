@@ -7,7 +7,6 @@ import "Model.js" as Model
 Item {
   id: root
 
-  property var shell: null
   property var manifest: null
 
   property var settings: ({})
@@ -38,6 +37,7 @@ Item {
   property double nowMs: Date.now()
 
   property var previousSnapshot: null
+  property int failedPolls: 0
 
   function refresh() {
     root.nowMs = Date.now()
@@ -58,18 +58,25 @@ Item {
     var events = Model.changes(root.previousSnapshot, freshPulls)
     var pings = Model.pingsToSend(events, root.notifyEnabled, root.notifyStarted)
     for (var i = 0; i < pings.length; i++) root.sendPing(pings[i])
-    root.previousSnapshot = Model.snapshot(freshPulls, root.previousSnapshot)
+    root.previousSnapshot = Model.snapshot(freshPulls, root.previousSnapshot, partialErrorText !== "")
     root.pulls = freshPulls
     root.merged = Model.parseMerged(answerText, Date.now())
     var freshStarred = Model.parseStarred(answerText)
     if (freshStarred !== null) root.projectStarred = freshStarred
     var freshViewer = Model.parseViewer(answerText)
-    if (freshViewer.avatarUrl !== root.viewer.avatarUrl || freshViewer.login !== root.viewer.login) root.viewer = freshViewer
+    if (freshViewer.avatarUrl !== root.viewer.avatarUrl) root.viewer = freshViewer
     root.counts = Model.countByState(freshPulls)
     root.lastUpdateMs = Date.now()
+    root.failedPolls = 0
     root.status = partialErrorText ? "partial" : "ok"
     root.errorText = partialErrorText || ""
     return true
+  }
+
+  function pollFailed(statusName, text) {
+    root.failedPolls = Math.min(root.failedPolls + 1, 10)
+    root.status = statusName
+    root.errorText = text
   }
 
   function lastLine(text) {
@@ -85,24 +92,16 @@ Item {
     stderr: StdioCollector { id: pollErr; waitForEnd: true }
     onExited: function(exitCode) {
       if (exitCode === 0) {
-        if (!root.acceptAnswer(pollOut.text, "")) {
-          root.status = "error"
-          root.errorText = "Unexpected answer from GitHub"
-        }
+        if (!root.acceptAnswer(pollOut.text, "")) root.pollFailed("error", "Unexpected answer from GitHub")
         return
       }
       if (exitCode === root.ghMissingExitCode) {
-        root.status = "no-gh"
-        root.errorText = "GitHub CLI not found: sudo pacman -S github-cli, then gh auth login"
+        root.pollFailed("no-gh", "GitHub CLI not found: install github-cli, then gh auth login")
       } else if (exitCode === root.ghTimedOutExitCode) {
-        root.status = "error"
-        root.errorText = "GitHub did not answer in time"
+        root.pollFailed("error", "GitHub did not answer in time")
       } else {
         var reason = root.lastLine(pollErr.text) || "gh failed (exit " + exitCode + ")"
-        if (!root.acceptAnswer(pollOut.text, reason)) {
-          root.status = "error"
-          root.errorText = reason
-        }
+        if (!root.acceptAnswer(pollOut.text, reason)) root.pollFailed("error", reason)
       }
     }
   }
@@ -126,7 +125,7 @@ Item {
   }
 
   Timer {
-    interval: root.pollSeconds * 1000
+    interval: Model.nextPollSeconds(root.pollSeconds, root.failedPolls) * 1000
     repeat: true
     running: true
     triggeredOnStart: true
