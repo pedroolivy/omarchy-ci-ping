@@ -12,7 +12,10 @@ starts, passes or fails on any of your open pull requests.
 - **In the bar.** How many PRs you have open, with an hourglass while CI runs
   and a red cross when something failed.
 - **One click to the PR.** Click the icon for a list of your PRs, failures
-  first. Click a row to open exactly that PR.
+  first, each with the branch it goes into and its CI status. Click a row to
+  open exactly that PR.
+- **Quiet when you want.** The bell at the top of the panel turns the pings
+  off; the panel keeps tracking everything.
 
 ## Requirements
 
@@ -41,6 +44,7 @@ admin of that organization has to allow the GitHub CLI once.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
+| `notify` | `true` | Show pings on screen (the bell in the panel flips it) |
 | `pollSeconds` | `60` | How often to ask GitHub (30 to 900 seconds) |
 | `notifyStarted` | `true` | Ping when CI starts, not only when it ends |
 

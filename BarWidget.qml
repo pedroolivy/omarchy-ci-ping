@@ -51,12 +51,20 @@ Panel {
     return text
   }
 
+  readonly property bool pingsOn: root.setting("notify", true) !== false
+
+  function togglePings() {
+    root.settings = Object.assign({}, root.settings, { notify: !root.pingsOn })
+    if (root.bar && root.bar.shell) root.bar.shell.updateEntryInline(root.moduleName, root.settings)
+  }
+
   readonly property string countText: pulls.length === 1 ? "1 open pull request" : pulls.length + " open pull requests"
 
   readonly property string tooltip: {
     if (loading) return "CI Ping · asking GitHub…"
     var lines = [pulls.length === 0 ? "CI Ping · no open pull requests" : "CI Ping · " + countText]
     if (problem) lines.push(problem)
+    if (!pingsOn) lines.push("Pings off")
     if (pulls.length > 0) lines.push("Click to see them")
     return lines.join("\n")
   }
@@ -135,15 +143,63 @@ Panel {
           font.bold: true
         }
 
-        Text {
+        Row {
           id: headingCount
           anchors.right: parent.right
           anchors.verticalCenter: parent.verticalCenter
-          textFormat: Text.PlainText
-          text: root.pulls.length > 0 ? root.pulls.length + " open" : ""
-          color: Color.muted
-          font.family: Style.font.family
-          font.pixelSize: Style.font.body
+          spacing: Style.space(12)
+
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: root.pulls.length > 0 ? root.pulls.length + " open" : ""
+            color: Color.muted
+            font.family: Style.font.family
+            font.pixelSize: Style.font.body
+          }
+
+          Rectangle {
+            id: pingsToggle
+            anchors.verticalCenter: parent.verticalCenter
+            implicitWidth: pingsToggleRow.implicitWidth + Style.space(14)
+            implicitHeight: pingsToggleRow.implicitHeight + Style.space(6)
+            radius: height / 2
+            color: pingsToggleArea.containsMouse ? Util.alpha(Color.popups.text, 0.12) : Util.alpha(Color.popups.text, 0.05)
+            border.width: 1
+            border.color: root.pingsOn ? Util.alpha(root.green, 0.6) : Util.alpha(Color.muted, 0.6)
+
+            Row {
+              id: pingsToggleRow
+              anchors.centerIn: parent
+              spacing: Style.space(6)
+
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: root.pingsOn ? "\uf0f3" : "\uf1f6"
+                color: root.pingsOn ? root.green : Color.muted
+                font.family: Style.font.family
+                font.pixelSize: Style.font.body
+              }
+
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: root.pingsOn ? "Pings on" : "Pings off"
+                color: root.pingsOn ? Color.popups.text : Color.muted
+                font.family: Style.font.family
+                font.pixelSize: Style.font.caption
+              }
+            }
+
+            MouseArea {
+              id: pingsToggleArea
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.togglePings()
+            }
+          }
         }
       }
 

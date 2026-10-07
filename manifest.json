@@ -37,10 +37,18 @@
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
+      "notify": true,
       "pollSeconds": 60,
       "notifyStarted": true
     },
     "schema": [
+      {
+        "key": "notify",
+        "type": "boolean",
+        "label": "Pings on screen",
+        "defaultValue": true,
+        "description": "Off keeps CI Ping quiet: follow your pull requests in the panel instead. The bell at the top of the panel flips it too."
+      },
       {
         "key": "pollSeconds",
         "type": "integer",
