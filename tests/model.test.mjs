@@ -271,6 +271,13 @@ test("a merged PR leaves the panel after 24 hours even when GitHub stops answeri
   assert.deepEqual([...M.panelRows([], merged, [], NOW + 2 * HOUR)], [])
 })
 
+test("hidden merged PRs stay hidden when settings come back as a list-like object", () => {
+  const merged = M.parseMerged(mergedAnswer([["o/r", 1, 1, "main"], ["o/r", 2, 2, "main"]]), NOW)
+  const listLike = { 0: { key: "o/r#1", mergedMs: merged[0].mergedMs }, length: 1 }
+  assert.deepEqual([...M.visibleMerged(merged, listLike, NOW)].map((p) => p.key), ["o/r#2"])
+  assert.deepEqual([...M.keepDismissed(listLike, merged, [], NOW)].map((d) => d.key), ["o/r#1"])
+})
+
 test("panel rows: open first, then a header and the merged ones still shown", () => {
   const open = step(null, [["o/r", 5, "a", "SUCCESS"], ["o/r", 6, "b", "FAILURE"]]).pulls
   const merged = M.parseMerged(mergedAnswer([["o/r", 1, 1, "main"], ["o/r", 2, 2, "main"]]), NOW)

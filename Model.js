@@ -234,8 +234,18 @@ function parseMerged(text, nowMs) {
   return merged.sort(function(a, b) { return b.mergedMs - a.mergedMs })
 }
 
+function listOf(value) {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === "object" && typeof value.length === "number") {
+    var list = []
+    for (var i = 0; i < value.length; i++) list.push(value[i])
+    return list
+  }
+  return value ? [value] : []
+}
+
 function dismissedList(value) {
-  var items = Array.isArray(value) ? value : (value ? [value] : [])
+  var items = listOf(value)
   var entries = []
   for (var i = 0; i < items.length; i++) {
     var item = items[i]
