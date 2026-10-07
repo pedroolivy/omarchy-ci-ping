@@ -44,6 +44,28 @@ Item {
     if (!poll.running) poll.running = true
   }
 
+  readonly property string runtimeDir: String(Quickshell.env("XDG_RUNTIME_DIR") || "")
+  readonly property string linkFilePath: root.runtimeDir !== "" ? root.runtimeDir + "/ci-ping-open.html" : ""
+
+  FileView {
+    id: linkFile
+    path: root.linkFilePath
+    watchChanges: false
+    printErrors: false
+    blockWrites: true
+  }
+
+  function openLink(url) {
+    if (!Model.isPullUrl(url)) {
+      Util.execArgv(["xdg-open", url])
+    } else if (root.linkFilePath === "") {
+      Util.execArgv(["xdg-open", Model.PULLS_URL])
+    } else {
+      linkFile.setText(Model.redirectPage(url))
+      Util.execArgv(["xdg-open", root.linkFilePath])
+    }
+  }
+
   function sendPing(ping) {
     Util.execArgv(["notify-send", "-a", "CI Ping", "-u", ping.urgency, "-t", String(ping.timeoutMs), ping.title, ping.body])
   }

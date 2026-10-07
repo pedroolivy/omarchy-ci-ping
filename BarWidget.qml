@@ -32,7 +32,8 @@ Panel {
   }
 
   function openLink(url) {
-    Util.execArgv(["xdg-open", url])
+    if (root.service) root.service.openLink(url)
+    else Util.execArgv(["xdg-open", Model.isPullUrl(url) ? Model.PULLS_URL : url])
     root.close()
   }
 
