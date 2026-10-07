@@ -7,7 +7,7 @@ var MAX_PINGS_PER_POLL = 3
 var PR_URL = /^https:\/\/github\.com\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+\/pull\/\d+$/
 
 var QUERY = "query{viewer{pullRequests(first:100,states:OPEN,orderBy:{field:UPDATED_AT,direction:DESC})"
-  + "{nodes{number title url isDraft repository{nameWithOwner}"
+  + "{nodes{number title url isDraft baseRefName repository{nameWithOwner}"
   + " commits(last:1){nodes{commit{oid statusCheckRollup{state}}}}}}}}"
 
 function clampPollSeconds(value) {
@@ -50,6 +50,7 @@ function parsePulls(text) {
       title: String(node.title || ""),
       url: PR_URL.test(String(node.url || "")) ? String(node.url) : "",
       draft: node.isDraft === true,
+      base: String(node.baseRefName || ""),
       sha: commit ? String(commit.oid || "") : "",
       ci: ciState(commit && commit.statusCheckRollup ? commit.statusCheckRollup.state : null)
     })
@@ -122,8 +123,41 @@ function sortForPanel(pulls) {
     .map(function(entry) { return entry.pull })
 }
 
-var STATE_ICON = { failed: "", running: "󰔟", passed: "", none: "" }
-var STATE_TEXT = { failed: "CI failed", running: "CI running", passed: "CI passed", none: "No CI" }
+var CI_MARK = { failed: "", running: "", passed: "", none: "" }
+var CI_LABEL = { failed: "Failed", running: "Running", passed: "Passed", none: "No CI" }
+var PULL_ICON_OPEN = ""
+var PULL_ICON_DRAFT = ""
+
+function pullIcon(pull) {
+  return pull.draft ? PULL_ICON_DRAFT : PULL_ICON_OPEN
+}
+
+function pullSubtitle(pull) {
+  return pull.repo + " #" + pull.number + (pull.base ? "  → " + pull.base : "") + (pull.draft ? "  ·  draft" : "")
+}
+
+var PALETTE_KEYS = {
+  red: ["red", "color1"],
+  green: ["green", "color2"],
+  yellow: ["yellow", "color3"],
+  purple: ["magenta", "purple", "color5"]
+}
+
+function themePalette(colorsToml) {
+  var found = {}
+  var lines = String(colorsToml || "").split("\n")
+  for (var i = 0; i < lines.length; i++) {
+    var match = lines[i].match(/^\s*([A-Za-z0-9_-]+)\s*=\s*["']?(#[0-9A-Fa-f]{6})/)
+    if (match) found[match[1]] = match[2]
+  }
+  var palette = {}
+  for (var role in PALETTE_KEYS) {
+    palette[role] = ""
+    var keys = PALETTE_KEYS[role]
+    for (var k = 0; k < keys.length && !palette[role]; k++) palette[role] = found[keys[k]] || ""
+  }
+  return palette
+}
 
 function openUrl(pull) {
   return pull && pull.url ? pull.url : PULLS_URL
