@@ -26,9 +26,10 @@ starts, passes or fails on any of your open pull requests.
   work; it keeps updating. Click Pinned or the bar icon to let it go.
 - **Starts with your session.** Once it is in the bar, Omarchy loads it at
   every login. Nothing else to set up.
-- **Star it in one click.** "Star on GitHub" in the panel footer stars the
-  project with your own `gh` login, only when you click it, then says thanks
-  and goes away. If starring fails, it opens the project page instead.
+- **Star it if you like it.** "Star on GitHub" in the panel footer opens this
+  project's page, where you decide. It says thanks and goes away for good.
+- **Read-only.** CI Ping never acts on your account: every request it makes is
+  a read.
 - **Quiet when you want.** The bell at the top of the panel turns the pings
   off; the panel keeps tracking everything.
 
@@ -88,8 +89,7 @@ between tries, up to 15 minutes, and goes back to normal on the next answer.
 What leaves your machine:
 
 - that request, through `gh`, every poll;
-- your avatar, loaded from `avatars.githubusercontent.com`;
-- one star request to this repository, only when you click "Star on GitHub".
+- your avatar, loaded from `avatars.githubusercontent.com`.
 
 Nothing else.
 

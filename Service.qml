@@ -30,8 +30,6 @@ Item {
   property var viewer: Model.parseViewer("")
   readonly property string projectUrl: Model.repositoryUrl(root.manifest)
   property var projectStarred: null
-
-  signal starFinished(bool starred)
   property var counts: Model.countByState([])
   property double lastUpdateMs: 0
   property double nowMs: Date.now()
@@ -125,24 +123,6 @@ Item {
         var reason = root.lastLine(pollErr.text) || "gh failed (exit " + exitCode + ")"
         if (!root.acceptAnswer(pollOut.text, reason)) root.pollFailed("error", reason)
       }
-    }
-  }
-
-  function starProject() {
-    var path = Model.starPath(root.projectUrl)
-    if (path === "" || star.running) return false
-    star.command = ["sh", "-c",
-                    'command -v gh >/dev/null 2>&1 || exit ' + root.ghMissingExitCode + '; exec timeout 20 gh "$@"',
-                    "sh", "api", "--method", "PUT", path, "--silent"]
-    star.running = true
-    return true
-  }
-
-  Process {
-    id: star
-    onExited: function(exitCode) {
-      if (exitCode === 0) root.projectStarred = true
-      root.starFinished(exitCode === 0)
     }
   }
 

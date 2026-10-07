@@ -328,13 +328,6 @@ test("star state is true, false, or unknown", () => {
   assert.equal(M.parseStarred("not json"), null)
 })
 
-test("starring targets only the plugin's own repository", () => {
-  assert.equal(M.starPath("https://github.com/pedroolivy/omarchy-ci-ping"), "/user/starred/pedroolivy/omarchy-ci-ping")
-  for (const bad of ["", "https://evil.example/a/b", "https://github.com/a", "https://github.com/a/b/../c"]) {
-    assert.equal(M.starPath(bad), "", bad)
-  }
-})
-
 test("a partial answer with a missing CI state never makes a result ping twice", () => {
   const good = (rollup) => M.parsePulls(answer([["o/r", 1, "abc", rollup]]))
   let previous = M.snapshot(good("PENDING"), null, false)
