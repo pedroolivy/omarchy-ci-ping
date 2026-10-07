@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.pedroolivy.ci-ping",
+  "name": "CI Ping",
+  "version": "0.1.0",
+  "author": "Pedro S. Oliveira",
+  "license": "MIT",
+  "description": "Pings you on screen when CI starts, passes or fails on any of your open pull requests, in every repo and organization. Finds your PRs by itself through the GitHub CLI: no token, no repo list.",
+  "homepage": "https://github.com/pedroolivy/omarchy-ci-ping",
+  "repository": "https://github.com/pedroolivy/omarchy-ci-ping",
+  "keywords": [
+    "github",
+    "ci",
+    "pull-requests",
+    "actions",
+    "notifications"
+  ],
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "CI Ping",
+    "description": "Your open pull requests and their CI in the bar",
+    "category": "Info",
+    "aliases": [
+      "ci",
+      "ci-ping",
+      "github",
+      "pull requests",
+      "prs"
+    ],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "pollSeconds": 60,
+      "notifyStarted": true
+    },
+    "schema": [
+      {
+        "key": "pollSeconds",
+        "type": "integer",
+        "label": "Check every (seconds)",
+        "min": 30,
+        "max": 900,
+        "step": 15,
+        "defaultValue": 60,
+        "description": "How often to ask GitHub about your pull requests. Lower means faster pings."
+      },
+      {
+        "key": "notifyStarted",
+        "type": "boolean",
+        "label": "Ping when CI starts",
+        "defaultValue": true,
+        "description": "Off keeps only the passed and failed pings."
+      }
+    ]
+  }
+}
