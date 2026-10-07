@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.pedroolivy.ci-ping",
   "name": "CI Ping",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": "Pedro S. Oliveira",
   "license": "MIT",
   "description": "Pings you on screen when CI starts, passes or fails on any of your open pull requests, in every repo and organization. Finds your PRs by itself through the GitHub CLI: no token, no repo list.",
