@@ -10,7 +10,7 @@ var PR_URL = /^https:\/\/github\.com\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+\/pull\/\d
 
 var VIEWER_FIELDS = "avatarUrl(size:64) "
   + "open:pullRequests(first:100,states:OPEN,orderBy:{field:UPDATED_AT,direction:DESC})"
-  + "{nodes{number title url isDraft baseRefName repository{nameWithOwner}"
+  + "{nodes{number title url isDraft baseRefName repository{nameWithOwner isPrivate}"
   + " commits(last:1){nodes{commit{oid statusCheckRollup{state}}}}}}"
   + " merged:pullRequests(first:50,states:MERGED,orderBy:{field:UPDATED_AT,direction:DESC})"
   + "{nodes{number title url mergedAt baseRefName repository{nameWithOwner}}}"
@@ -72,6 +72,7 @@ function parsePulls(text) {
       title: String(node.title || ""),
       url: PR_URL.test(String(node.url || "")) ? String(node.url) : "",
       draft: node.isDraft === true,
+      private: node.repository.isPrivate !== false,
       base: String(node.baseRefName || ""),
       sha: commit ? String(commit.oid || "") : "",
       ci: ciState(commit && commit.statusCheckRollup ? commit.statusCheckRollup.state : null)
@@ -118,9 +119,11 @@ function escapeMarkup(text) {
   return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
 }
 
+var PRIVATE_PING_BODY = "A pull request in a private repository\nOpen CI Ping to see which one"
+
 function notification(event) {
   var pull = event.pull
-  var body = escapeMarkup(pull.repo) + " #" + pull.number + "\n" + escapeMarkup(pull.title)
+  var body = pull.private ? PRIVATE_PING_BODY : escapeMarkup(pull.repo) + " #" + pull.number + "\n" + escapeMarkup(pull.title)
   if (event.kind === "started") return { urgency: "low", timeoutMs: 6000, title: "⏳ CI running", body: body }
   if (event.kind === "passed") return { urgency: "normal", timeoutMs: 8000, title: "✅ CI passed", body: body }
   return { urgency: "critical", timeoutMs: 0, title: "❌ CI failed", body: body }
@@ -320,4 +323,14 @@ function parseStarred(text) {
 function starPath(projectUrl) {
   var parts = repoParts(projectUrl)
   return parts ? "/user/starred/" + parts.owner + "/" + parts.name : ""
+}
+
+function isPullUrl(url) {
+  return PR_URL.test(String(url || ""))
+}
+
+function redirectPage(url) {
+  var target = isPullUrl(url) ? url : PULLS_URL
+  return "<!doctype html><meta charset=\"utf-8\"><meta name=\"referrer\" content=\"no-referrer\">"
+    + "<meta http-equiv=\"refresh\" content=\"0;url=" + escapeMarkup(target) + "\"><title>CI Ping</title>\n"
 }
