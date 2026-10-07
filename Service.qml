@@ -17,6 +17,7 @@ Item {
   }
 
   readonly property int pollSeconds: Model.clampPollSeconds(setting("pollSeconds", 60))
+  readonly property bool notifyEnabled: setting("notify", true) !== false
   readonly property bool notifyStarted: setting("notifyStarted", true) !== false
 
   readonly property int ghTimeoutSeconds: 45
@@ -46,10 +47,8 @@ Item {
     } catch (parseError) {
       return false
     }
-    var events = Model.changes(root.previousSnapshot, freshPulls).filter(function(event) {
-      return event.kind !== "started" || root.notifyStarted
-    })
-    var pings = Model.notifications(events)
+    var events = Model.changes(root.previousSnapshot, freshPulls)
+    var pings = Model.pingsToSend(events, root.notifyEnabled, root.notifyStarted)
     for (var i = 0; i < pings.length; i++) root.sendPing(pings[i])
     root.previousSnapshot = Model.snapshot(freshPulls, root.previousSnapshot)
     root.pulls = freshPulls

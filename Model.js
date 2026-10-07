@@ -116,6 +116,13 @@ function notifications(events) {
   }]
 }
 
+function pingsToSend(events, notifyEnabled, notifyStarted) {
+  if (!notifyEnabled) return []
+  return notifications(events.filter(function(event) {
+    return event.kind !== "started" || notifyStarted
+  }))
+}
+
 var PANEL_ORDER = { failed: 0, running: 1, passed: 2, none: 3 }
 function sortForPanel(pulls) {
   return pulls.map(function(pull, index) { return { pull: pull, index: index } })
