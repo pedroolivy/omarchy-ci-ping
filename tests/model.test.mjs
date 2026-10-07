@@ -286,15 +286,14 @@ test("time ago reads in minutes, then hours", () => {
 })
 
 test("the avatar is a GitHub avatar address, or nothing", () => {
-  const viewer = (login, avatarUrl) => JSON.stringify({ data: { viewer: { login, avatarUrl, open: { nodes: [] } } } })
-  assert.deepEqual({ ...M.parseViewer(viewer("pedroolivy", "https://avatars.githubusercontent.com/u/1?s=64&v=4")) },
-    { login: "pedroolivy", avatarUrl: "https://avatars.githubusercontent.com/u/1?s=64&v=4" })
+  const viewer = (avatarUrl) => JSON.stringify({ data: { viewer: { avatarUrl, open: { nodes: [] } } } })
+  assert.equal(M.parseViewer(viewer("https://avatars.githubusercontent.com/u/1?s=64&v=4")).avatarUrl,
+    "https://avatars.githubusercontent.com/u/1?s=64&v=4")
   for (const bad of ["http://avatars.githubusercontent.com/u/1", "https://evil.example/u/1.png", "file:///etc/passwd",
     "https://avatars.githubusercontent.com.evil.example/u/1", "https://avatars.githubusercontent.com/u/1 x", ""]) {
-    assert.equal(M.parseViewer(viewer("pedroolivy", bad)).avatarUrl, "", bad)
+    assert.equal(M.parseViewer(viewer(bad)).avatarUrl, "", bad)
   }
-  assert.equal(M.parseViewer(viewer("-bad", "")).login, "")
-  assert.deepEqual({ ...M.parseViewer("not json") }, { login: "", avatarUrl: "" })
+  assert.deepEqual({ ...M.parseViewer("not json") }, { avatarUrl: "" })
 })
 
 test("the star link points at the plugin's own GitHub repository, or is hidden", () => {
@@ -311,7 +310,6 @@ test("the query asks about the project only for a plain GitHub repository", () =
   assert.ok(M.buildQuery("https://github.com/pedroolivy/omarchy-ci-ping").endsWith(' project:repository(owner:"pedroolivy",name:"omarchy-ci-ping"){viewerHasStarred}}'))
   assert.ok(!M.buildQuery("").includes("project:"))
   assert.ok(!M.buildQuery('https://github.com/a/b"){x}').includes("project:"))
-  assert.equal(M.QUERY, M.buildQuery(""))
 })
 
 test("star state is true, false, or unknown", () => {
@@ -328,6 +326,37 @@ test("starring targets only the plugin's own repository", () => {
   for (const bad of ["", "https://evil.example/a/b", "https://github.com/a", "https://github.com/a/b/../c"]) {
     assert.equal(M.starPath(bad), "", bad)
   }
+})
+
+test("a partial answer with a missing CI state never makes a result ping twice", () => {
+  const good = (rollup) => M.parsePulls(answer([["o/r", 1, "abc", rollup]]))
+  let previous = M.snapshot(good("PENDING"), null, false)
+  assert.deepEqual(kinds(M.changes(previous, good("SUCCESS"))), ["passed o/r#1"])
+  previous = M.snapshot(good("SUCCESS"), previous, false)
+  const partial = M.parsePulls(answer([["o/r", 1, "abc", null]]))
+  assert.deepEqual(kinds(M.changes(previous, partial)), [])
+  previous = M.snapshot(partial, previous, true)
+  assert.deepEqual(kinds(M.changes(previous, good("SUCCESS"))), [])
+  const noCommit = M.parsePulls(answer([["o/r", 1, "", null]]))
+  previous = M.snapshot(noCommit, previous, true)
+  assert.deepEqual(kinds(M.changes(previous, good("SUCCESS"))), [])
+})
+
+test("the summary icon says what happened", () => {
+  const pulls = M.parsePulls(answer([1, 2, 3, 4].map((n) => ["o/r", n, "a", null])))
+  const events = (kind) => pulls.map((pull) => ({ kind, pull }))
+  assert.equal(M.notifications(events("started"))[0].title, "⏳ CI on 4 pull requests")
+  assert.equal(M.notifications(events("passed"))[0].title, "✅ CI on 4 pull requests")
+  assert.equal(M.notifications([...events("passed").slice(0, 3), { kind: "failed", pull: pulls[3] }])[0].title, "❌ CI on 4 pull requests")
+})
+
+test("after failed polls the plugin waits longer, up to 15 minutes", () => {
+  assert.equal(M.nextPollSeconds(60, 0), 60)
+  assert.equal(M.nextPollSeconds(60, 1), 120)
+  assert.equal(M.nextPollSeconds(60, 3), 480)
+  assert.equal(M.nextPollSeconds(60, 9), 900)
+  assert.equal(M.nextPollSeconds(30, 2), 120)
+  assert.equal(M.nextPollSeconds(60, -4), 60)
 })
 
 test("poll interval is clamped to 30..900 seconds", () => {
