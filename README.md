@@ -17,6 +17,8 @@ starts, passes or fails on any of your open pull requests.
 - **What just landed.** Pull requests merged in the last 24 hours stay at the
   bottom of the panel, with the branch they went into. Hide one with its ×, or
   all of them with Clear.
+- **Pin it.** Pin the panel to keep your pull requests on screen while you
+  work; it keeps updating. Click Pinned or the bar icon to let it go.
 - **Quiet when you want.** The bell at the top of the panel turns the pings
   off; the panel keeps tracking everything.
 
