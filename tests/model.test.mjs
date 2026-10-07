@@ -307,6 +307,29 @@ test("the star link points at the plugin's own GitHub repository, or is hidden",
   assert.equal(M.repositoryUrl(null), "")
 })
 
+test("the query asks about the project only for a plain GitHub repository", () => {
+  assert.ok(M.buildQuery("https://github.com/pedroolivy/omarchy-ci-ping").endsWith(' project:repository(owner:"pedroolivy",name:"omarchy-ci-ping"){viewerHasStarred}}'))
+  assert.ok(!M.buildQuery("").includes("project:"))
+  assert.ok(!M.buildQuery('https://github.com/a/b"){x}').includes("project:"))
+  assert.equal(M.QUERY, M.buildQuery(""))
+})
+
+test("star state is true, false, or unknown", () => {
+  const answer = (project) => JSON.stringify({ data: { viewer: { open: { nodes: [] } }, project } })
+  assert.equal(M.parseStarred(answer({ viewerHasStarred: true })), true)
+  assert.equal(M.parseStarred(answer({ viewerHasStarred: false })), false)
+  assert.equal(M.parseStarred(answer(null)), null)
+  assert.equal(M.parseStarred(answer(undefined)), null)
+  assert.equal(M.parseStarred("not json"), null)
+})
+
+test("starring targets only the plugin's own repository", () => {
+  assert.equal(M.starPath("https://github.com/pedroolivy/omarchy-ci-ping"), "/user/starred/pedroolivy/omarchy-ci-ping")
+  for (const bad of ["", "https://evil.example/a/b", "https://github.com/a", "https://github.com/a/b/../c"]) {
+    assert.equal(M.starPath(bad), "", bad)
+  }
+})
+
 test("poll interval is clamped to 30..900 seconds", () => {
   assert.equal(M.clampPollSeconds(5), 30)
   assert.equal(M.clampPollSeconds(60), 60)
