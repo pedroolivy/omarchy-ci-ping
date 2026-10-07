@@ -30,10 +30,9 @@ starts, passes or fails on any of your open pull requests.
 ## Requirements
 
 - Omarchy 4
-- The GitHub CLI, signed in:
+- The GitHub CLI (the `github-cli` package), signed in:
 
   ```bash
-  sudo pacman -S github-cli
   gh auth login
   ```
 
@@ -41,6 +40,20 @@ That is all. CI Ping uses the login `gh` already has: no token to create.
 
 Some organizations block third-party apps. If PRs from one are missing, an
 admin of that organization has to allow the GitHub CLI once.
+
+## Install
+
+```bash
+omarchy plugin add https://github.com/pedroolivy/omarchy-ci-ping.git --enable
+```
+
+Omarchy asks which part of the bar to put it in, and starts it right away.
+
+## Remove
+
+```bash
+omarchy plugin remove io.github.pedroolivy.ci-ping
+```
 
 ## Usage
 
@@ -62,11 +75,18 @@ admin of that organization has to allow the GitHub CLI once.
 
 One GraphQL request through `gh api graphql` per poll returns your open PRs
 with the combined check state of each PR's newest commit, the ones merged in
-the last 24 hours, your login and avatar, and whether you starred the
-project. The panel loads the avatar from
-`avatars.githubusercontent.com`; nothing else leaves your machine. The plugin compares
-it with the previous answer and pings only on a change. A PR without CI never
-pings.
+the last 24 hours, your avatar, and whether you starred the project. The
+plugin compares it with the previous answer and pings only on a change. A PR
+without CI never pings. When GitHub does not answer, the plugin waits longer
+between tries, up to 15 minutes, and goes back to normal on the next answer.
+
+What leaves your machine:
+
+- that request, through `gh`, every poll;
+- your avatar, loaded from `avatars.githubusercontent.com`;
+- one star request to this repository, only when you click "Star on GitHub".
+
+Nothing else.
 
 ## Development
 
