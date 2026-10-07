@@ -28,6 +28,7 @@ Item {
   property string errorText: ""
   property var pulls: []
   property var merged: []
+  property var viewer: Model.parseViewer("")
   property var counts: Model.countByState([])
   property double lastUpdateMs: 0
   property double nowMs: Date.now()
@@ -56,6 +57,8 @@ Item {
     root.previousSnapshot = Model.snapshot(freshPulls, root.previousSnapshot)
     root.pulls = freshPulls
     root.merged = Model.parseMerged(answerText, Date.now())
+    var freshViewer = Model.parseViewer(answerText)
+    if (freshViewer.avatarUrl !== root.viewer.avatarUrl || freshViewer.login !== root.viewer.login) root.viewer = freshViewer
     root.counts = Model.countByState(freshPulls)
     root.lastUpdateMs = Date.now()
     root.status = partialErrorText ? "partial" : "ok"

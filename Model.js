@@ -4,9 +4,11 @@ var MIN_POLL_SECONDS = 30
 var MAX_POLL_SECONDS = 900
 var PULLS_URL = "https://github.com/pulls"
 var MAX_PINGS_PER_POLL = 3
+var AVATAR_URL = /^https:\/\/avatars\.githubusercontent\.com\/[A-Za-z0-9\/._~?=&%-]+$/
+var LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/
 var PR_URL = /^https:\/\/github\.com\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+\/pull\/\d+$/
 
-var QUERY = "query{viewer{"
+var QUERY = "query{viewer{login avatarUrl(size:64) "
   + "open:pullRequests(first:100,states:OPEN,orderBy:{field:UPDATED_AT,direction:DESC})"
   + "{nodes{number title url isDraft baseRefName repository{nameWithOwner}"
   + " commits(last:1){nodes{commit{oid statusCheckRollup{state}}}}}}"
@@ -262,4 +264,20 @@ function panelRows(openPulls, merged, dismissedValue, nowMs) {
   if (shown.length > 0) rows.push({ kind: "header", pull: null })
   for (var i = 0; i < shown.length; i++) rows.push({ kind: "merged", pull: shown[i] })
   return rows
+}
+
+function parseViewer(text) {
+  var data
+  try {
+    data = JSON.parse(text)
+  } catch (parseError) {
+    return { login: "", avatarUrl: "" }
+  }
+  var viewer = data && data.data && data.data.viewer ? data.data.viewer : null
+  var login = viewer ? String(viewer.login || "") : ""
+  var avatarUrl = viewer ? String(viewer.avatarUrl || "") : ""
+  return {
+    login: LOGIN.test(login) ? login : "",
+    avatarUrl: AVATAR_URL.test(avatarUrl) ? avatarUrl : ""
+  }
 }

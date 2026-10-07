@@ -56,7 +56,9 @@ admin of that organization has to allow the GitHub CLI once.
 ## How it works
 
 One GraphQL request through `gh api graphql` per poll returns your open PRs
-and the combined check state of each PR's newest commit. The plugin compares
+with the combined check state of each PR's newest commit, the ones merged in
+the last 24 hours, and your login and avatar. The panel loads the avatar from
+`avatars.githubusercontent.com`; nothing else leaves your machine. The plugin compares
 it with the previous answer and pings only on a change. A PR without CI never
 pings.
 
