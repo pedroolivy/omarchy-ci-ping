@@ -36,7 +36,24 @@ Panel {
   }
 
   readonly property var pulls: service ? service.pulls : []
-  readonly property var rows: Model.sortForPanel(pulls)
+  readonly property var merged: service ? service.merged : []
+  readonly property var dismissedMerged: root.setting("dismissedMerged", [])
+  readonly property double nowMs: service ? service.nowMs : 0
+  readonly property var rows: Model.panelRows(pulls, merged, dismissedMerged, nowMs)
+
+  function saveDismissed(pullsToDismiss) {
+    var kept = Model.keepDismissed(root.dismissedMerged, root.merged, pullsToDismiss, root.nowMs)
+    root.settings = Object.assign({}, root.settings, { dismissedMerged: kept })
+    if (root.bar && root.bar.shell) root.bar.shell.updateEntryInline(root.moduleName, root.settings)
+  }
+
+  function dismissMerged(pull) {
+    root.saveDismissed([pull])
+  }
+
+  function dismissAllMerged() {
+    root.saveDismissed(Model.visibleMerged(root.merged, root.dismissedMerged, root.nowMs))
+  }
   readonly property var counts: service ? service.counts : Model.countByState([])
   readonly property bool failing: counts.failed > 0
   readonly property bool loading: !service || service.status === "loading"
@@ -73,13 +90,22 @@ Panel {
   readonly property color green: palette.green || Color.popups.text
   readonly property color red: palette.red || Color.urgent
   readonly property color yellow: palette.yellow || Color.accent
+  readonly property color purple: palette.purple || Color.accent
 
   FileView {
+    id: themeColors
     path: Color.currentThemePath + "/colors.toml"
     watchChanges: true
     printErrors: false
     onLoaded: root.palette = Model.themePalette(text())
     onFileChanged: reload()
+  }
+
+  Connections {
+    target: Color
+    function onForegroundChanged() { themeColors.reload() }
+    function onAccentChanged() { themeColors.reload() }
+    function onUrgentChanged() { themeColors.reload() }
   }
 
   function ciColor(ci) {
@@ -119,7 +145,7 @@ Panel {
     owner: root
     bar: root.bar
     open: root.opened
-    contentWidth: popup.fittedContentWidth(Style.space(440))
+    contentWidth: popup.fittedContentWidth(Style.space(500))
     contentHeight: popup.fittedContentHeight(column.implicitHeight)
 
     Column {
@@ -215,7 +241,7 @@ Panel {
       }
 
       Text {
-        visible: root.rows.length === 0
+        visible: root.pulls.length === 0
         width: parent.width
         textFormat: Text.PlainText
         text: root.loading ? "Asking GitHub…" : "No open pull requests"
@@ -228,41 +254,94 @@ Panel {
         id: list
         visible: root.rows.length > 0
         width: parent.width
-        height: Math.min(contentHeight, Style.space(420))
+        height: Math.min(contentHeight, Style.space(460))
         clip: true
         spacing: Style.space(2)
         boundsBehavior: Flickable.StopAtBounds
         model: root.rows
 
-        delegate: Rectangle {
-          id: row
+        delegate: Item {
+          id: entry
           required property var modelData
+          readonly property bool isHeader: modelData.kind === "header"
+          readonly property bool isMerged: modelData.kind === "merged"
+          readonly property var pull: modelData.pull
           width: list.width
-          height: rowText.implicitHeight + Style.space(14)
-          radius: Style.space(6)
-          color: rowHover.hovered ? Util.alpha(Color.popups.text, 0.1) : "transparent"
+          height: isHeader ? mergedHeader.implicitHeight + Style.space(16) : rowText.implicitHeight + Style.space(14)
 
-          Behavior on color { ColorAnimation { duration: 90 } }
+          Item {
+            id: mergedHeader
+            visible: entry.isHeader
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: Style.space(8)
+            anchors.rightMargin: Style.space(10)
+            anchors.bottomMargin: Style.space(4)
+            implicitHeight: mergedHeaderLabel.implicitHeight
+
+            Text {
+              id: mergedHeaderLabel
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: "Merged in the last 24 hours"
+              color: Color.muted
+              font.family: Style.font.family
+              font.pixelSize: Style.font.caption
+            }
+
+            Text {
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: "Clear"
+              color: clearArea.containsMouse ? Color.popups.text : Color.muted
+              font.family: Style.font.family
+              font.pixelSize: Style.font.caption
+
+              MouseArea {
+                id: clearArea
+                anchors.fill: parent
+                anchors.margins: -Style.space(4)
+                enabled: entry.isHeader
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.dismissAllMerged()
+              }
+            }
+          }
+
+          Rectangle {
+            visible: !entry.isHeader
+            anchors.fill: parent
+            radius: Style.space(6)
+            color: rowHover.hovered ? Util.alpha(Color.popups.text, 0.1) : "transparent"
+
+            Behavior on color { ColorAnimation { duration: 90 } }
+          }
 
           Text {
             id: rowIcon
+            visible: !entry.isHeader
             anchors.left: parent.left
             anchors.leftMargin: Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
             width: Style.space(20)
             horizontalAlignment: Text.AlignHCenter
             textFormat: Text.PlainText
-            text: Model.pullIcon(row.modelData)
-            color: row.modelData.draft ? Color.muted : root.green
+            text: entry.isHeader ? "" : (entry.isMerged ? Model.PULL_ICON_MERGED : Model.pullIcon(entry.pull))
+            color: entry.isMerged ? root.purple : (entry.pull && entry.pull.draft ? Color.muted : root.green)
             font.family: Style.font.family
             font.pixelSize: Style.font.iconLarge
           }
 
           Column {
             id: rowText
+            visible: !entry.isHeader
             anchors.left: rowIcon.right
             anchors.leftMargin: Style.space(10)
-            anchors.right: ciBadge.left
+            anchors.right: entry.isMerged ? dismissButton.left : ciBadge.left
             anchors.rightMargin: Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(2)
@@ -271,8 +350,8 @@ Panel {
               width: parent.width
               elide: Text.ElideRight
               textFormat: Text.PlainText
-              text: row.modelData.title
-              color: Color.popups.text
+              text: entry.pull ? entry.pull.title : ""
+              color: entry.isMerged ? Util.alpha(Color.popups.text, 0.75) : Color.popups.text
               font.family: Style.font.family
               font.pixelSize: Style.font.body
             }
@@ -281,15 +360,28 @@ Panel {
               width: parent.width
               elide: Text.ElideRight
               textFormat: Text.PlainText
-              text: Model.pullSubtitle(row.modelData)
+              text: !entry.pull ? "" : (entry.isMerged ? Model.mergedSubtitle(entry.pull, root.nowMs) : Model.pullSubtitle(entry.pull))
               color: Color.muted
               font.family: Style.font.family
               font.pixelSize: Style.font.caption
             }
           }
 
+          HoverHandler {
+            id: rowHover
+            enabled: !entry.isHeader
+            cursorShape: Qt.PointingHandCursor
+          }
+
+          MouseArea {
+            anchors.fill: parent
+            enabled: !entry.isHeader
+            onClicked: root.openLink(Model.openUrl(entry.pull))
+          }
+
           Row {
             id: ciBadge
+            visible: !entry.isHeader && !entry.isMerged
             anchors.right: parent.right
             anchors.rightMargin: Style.space(10)
             anchors.verticalCenter: parent.verticalCenter
@@ -299,8 +391,8 @@ Panel {
               visible: text !== ""
               anchors.verticalCenter: parent.verticalCenter
               textFormat: Text.PlainText
-              text: Model.CI_MARK[row.modelData.ci]
-              color: root.ciColor(row.modelData.ci)
+              text: entry.pull && !entry.isMerged ? Model.CI_MARK[entry.pull.ci] : ""
+              color: entry.pull ? root.ciColor(entry.pull.ci) : Color.muted
               font.family: Style.font.family
               font.pixelSize: Style.font.body
             }
@@ -308,20 +400,41 @@ Panel {
             Text {
               anchors.verticalCenter: parent.verticalCenter
               textFormat: Text.PlainText
-              text: Model.CI_LABEL[row.modelData.ci]
-              color: root.ciColor(row.modelData.ci)
+              text: entry.pull && !entry.isMerged ? Model.CI_LABEL[entry.pull.ci] : ""
+              color: entry.pull ? root.ciColor(entry.pull.ci) : Color.muted
               font.family: Style.font.family
               font.pixelSize: Style.font.caption
             }
           }
 
-          HoverHandler {
-            id: rowHover
-            cursorShape: Qt.PointingHandCursor
-          }
+          Rectangle {
+            id: dismissButton
+            visible: entry.isMerged
+            anchors.right: parent.right
+            anchors.rightMargin: Style.space(6)
+            anchors.verticalCenter: parent.verticalCenter
+            width: Style.space(24)
+            height: Style.space(24)
+            radius: width / 2
+            color: dismissArea.containsMouse ? Util.alpha(Color.popups.text, 0.15) : "transparent"
 
-          TapHandler {
-            onTapped: root.openLink(Model.openUrl(row.modelData))
+            Text {
+              anchors.centerIn: parent
+              textFormat: Text.PlainText
+              text: ""
+              color: dismissArea.containsMouse ? Color.popups.text : Color.muted
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+            }
+
+            MouseArea {
+              id: dismissArea
+              anchors.fill: parent
+              enabled: entry.isMerged
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.dismissMerged(entry.pull)
+            }
           }
         }
       }

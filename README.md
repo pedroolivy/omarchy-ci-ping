@@ -14,6 +14,9 @@ starts, passes or fails on any of your open pull requests.
 - **One click to the PR.** Click the icon for a list of your PRs, failures
   first, each with the branch it goes into and its CI status. Click a row to
   open exactly that PR.
+- **What just landed.** Pull requests merged in the last 24 hours stay at the
+  bottom of the panel, with the branch they went into. Hide one with its ×, or
+  all of them with Clear.
 - **Quiet when you want.** The bell at the top of the panel turns the pings
   off; the panel keeps tracking everything.
 
