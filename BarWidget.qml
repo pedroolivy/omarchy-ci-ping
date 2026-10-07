@@ -115,7 +115,29 @@ Panel {
     return Color.muted
   }
 
-  onOpenedChanged: if (opened && service) service.refresh()
+  property bool pinned: false
+
+  function close() {
+    if (root.pinned) return
+    root.controller.hide()
+  }
+
+  function closeForPopoutSwitch() {
+    if (root.pinned) return
+    root.popoutSwitchClosing = true
+    root.controller.hide()
+    Qt.callLater(function() { root.popoutSwitchClosing = false })
+  }
+
+  function unpinAndClose() {
+    root.pinned = false
+    root.controller.hide()
+  }
+
+  onOpenedChanged: {
+    if (opened && service) service.refresh()
+    if (!opened) pinned = false
+  }
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -133,6 +155,8 @@ Panel {
     onPressed: function(b) {
       if (b === Qt.RightButton) {
         if (root.service) root.service.refresh()
+      } else if (root.pinned) {
+        root.unpinAndClose()
       } else {
         root.toggle()
       }
@@ -145,6 +169,7 @@ Panel {
     owner: root
     bar: root.bar
     open: root.opened
+    triggerMode: root.pinned ? "hover" : "click"
     contentWidth: popup.fittedContentWidth(Style.space(500))
     contentHeight: popup.fittedContentHeight(column.implicitHeight)
 
@@ -182,6 +207,49 @@ Panel {
             color: Color.muted
             font.family: Style.font.family
             font.pixelSize: Style.font.body
+          }
+
+          Rectangle {
+            id: pinToggle
+            anchors.verticalCenter: parent.verticalCenter
+            implicitWidth: pinToggleRow.implicitWidth + Style.space(14)
+            implicitHeight: pinToggleRow.implicitHeight + Style.space(6)
+            radius: height / 2
+            color: pinToggleArea.containsMouse ? Util.alpha(Color.popups.text, 0.12) : Util.alpha(Color.popups.text, 0.05)
+            border.width: 1
+            border.color: root.pinned ? Util.alpha(Color.accent, 0.8) : Util.alpha(Color.muted, 0.6)
+
+            Row {
+              id: pinToggleRow
+              anchors.centerIn: parent
+              spacing: Style.space(6)
+
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: root.pinned ? "\udb81\udc03" : "\udb81\udc04"
+                color: root.pinned ? Color.accent : Color.muted
+                font.family: Style.font.family
+                font.pixelSize: Style.font.body
+              }
+
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: root.pinned ? "Pinned" : "Pin"
+                color: root.pinned ? Color.popups.text : Color.muted
+                font.family: Style.font.family
+                font.pixelSize: Style.font.caption
+              }
+            }
+
+            MouseArea {
+              id: pinToggleArea
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.pinned = !root.pinned
+            }
           }
 
           Rectangle {
