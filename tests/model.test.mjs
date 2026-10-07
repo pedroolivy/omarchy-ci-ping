@@ -24,7 +24,7 @@ function test(name, fn) {
 function answer(rows) {
   return JSON.stringify({
     data: { viewer: { pullRequests: { nodes: rows.map(([repo, number, sha, rollup]) => ({
-      number, title: "PR " + number, url: `https://github.com/${repo}/pull/${number}`, isDraft: false,
+      number, title: "PR " + number, url: `https://github.com/${repo}/pull/${number}`, isDraft: false, baseRefName: "main",
       repository: { nameWithOwner: repo },
       commits: { nodes: sha ? [{ commit: { oid: sha, statusCheckRollup: rollup ? { state: rollup } : null } }] : [] }
     })) } } }
@@ -186,6 +186,31 @@ test("many changes in one poll become a single summary ping", () => {
   assert.equal(pings[0].body, "2 failed · 3 passed")
   const few = M.notifications(M.changes(s.next, pulls.slice(0, 3)))
   assert.equal(few.length, 3)
+})
+
+test("a row shows the repo, number and the branch the PR goes into", () => {
+  const [pull] = step(null, [["o/r", 2, "a", "SUCCESS"]]).pulls
+  assert.equal(pull.base, "main")
+  assert.equal(M.pullSubtitle(pull), "o/r #2  → main")
+  assert.equal(M.pullSubtitle({ ...pull, draft: true }), "o/r #2  → main  ·  draft")
+  assert.equal(M.pullIcon({ draft: false }), M.PULL_ICON_OPEN)
+  assert.equal(M.pullIcon({ draft: true }), M.PULL_ICON_DRAFT)
+})
+
+test("every CI state has a mark and a label", () => {
+  for (const ci of ["failed", "running", "passed", "none"]) {
+    assert.equal(typeof M.CI_MARK[ci], "string", ci)
+    assert.ok(M.CI_LABEL[ci], ci)
+  }
+  assert.equal(M.CI_MARK.none, "")
+})
+
+test("theme palette reads named colors, falls back to colorN, else stays empty", () => {
+  assert.deepEqual({ ...M.themePalette('red = "#f7768e"\ngreen = "#9ece6a"\nyellow = "#e0af68"\nmagenta = "#ad8ee6"') },
+    { red: "#f7768e", green: "#9ece6a", yellow: "#e0af68", purple: "#ad8ee6" })
+  assert.deepEqual({ ...M.themePalette("color1 = '#aa0000'\ncolor2 = '#00aa00'\ncolor3 = '#aaaa00'\ncolor5 = '#aa00aa'") },
+    { red: "#aa0000", green: "#00aa00", yellow: "#aaaa00", purple: "#aa00aa" })
+  assert.deepEqual({ ...M.themePalette("") }, { red: "", green: "", yellow: "", purple: "" })
 })
 
 test("poll interval is clamped to 30..900 seconds", () => {
