@@ -213,6 +213,15 @@ test("theme palette reads named colors, falls back to colorN, else stays empty",
   assert.deepEqual({ ...M.themePalette("") }, { red: "", green: "", yellow: "", purple: "" })
 })
 
+test("pings off sends nothing; started pings can be turned off alone", () => {
+  let s = step(null, [["o/r", 1, "a", null], ["o/r", 2, "b", "PENDING"]])
+  const pulls = M.parsePulls(answer([["o/r", 1, "a", "PENDING"], ["o/r", 2, "b", "FAILURE"]]))
+  const events = M.changes(s.next, pulls)
+  assert.equal(M.pingsToSend(events, false, true).length, 0)
+  assert.deepEqual([...M.pingsToSend(events, true, false)].map((p) => p.title), ["\u274c CI failed"])
+  assert.equal(M.pingsToSend(events, true, true).length, 2)
+})
+
 test("poll interval is clamped to 30..900 seconds", () => {
   assert.equal(M.clampPollSeconds(5), 30)
   assert.equal(M.clampPollSeconds(60), 60)
