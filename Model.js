@@ -5,11 +5,10 @@ var MAX_POLL_SECONDS = 900
 var PULLS_URL = "https://github.com/pulls"
 var MAX_PINGS_PER_POLL = 3
 var AVATAR_URL = /^https:\/\/avatars\.githubusercontent\.com\/[A-Za-z0-9\/._~?=&%-]+$/
-var LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/
 var REPO_URL = /^https:\/\/github\.com\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/
 var PR_URL = /^https:\/\/github\.com\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+\/pull\/\d+$/
 
-var VIEWER_FIELDS = "login avatarUrl(size:64) "
+var VIEWER_FIELDS = "avatarUrl(size:64) "
   + "open:pullRequests(first:100,states:OPEN,orderBy:{field:UPDATED_AT,direction:DESC})"
   + "{nodes{number title url isDraft baseRefName repository{nameWithOwner}"
   + " commits(last:1){nodes{commit{oid statusCheckRollup{state}}}}}}"
@@ -27,7 +26,11 @@ function buildQuery(projectUrl) {
   return "query{viewer{" + VIEWER_FIELDS + "}" + project + "}"
 }
 
-var QUERY = buildQuery("")
+
+function nextPollSeconds(pollSeconds, failedPolls) {
+  var failures = Math.max(0, Math.min(10, Math.floor(Number(failedPolls) || 0)))
+  return Math.min(MAX_POLL_SECONDS, clampPollSeconds(pollSeconds) * Math.pow(2, failures))
+}
 
 function clampPollSeconds(value) {
   var seconds = Math.round(Number(value))
@@ -77,10 +80,15 @@ function parsePulls(text) {
   return pulls
 }
 
-function snapshot(pulls, previous) {
+function snapshot(pulls, previous, partialAnswer) {
   var seen = {}
   for (var key in previous || {}) if (previous.hasOwnProperty(key)) seen[key] = previous[key]
-  for (var i = 0; i < pulls.length; i++) seen[pulls[i].key] = { sha: pulls[i].sha, ci: pulls[i].ci }
+  for (var i = 0; i < pulls.length; i++) {
+    var pull = pulls[i]
+    var unknownInPartialAnswer = partialAnswer && (pull.ci === "none" || pull.sha === "")
+    if (unknownInPartialAnswer && seen.hasOwnProperty(pull.key)) continue
+    seen[pull.key] = { sha: pull.sha, ci: pull.ci }
+  }
   return seen
 }
 
@@ -127,10 +135,11 @@ function notifications(events) {
   if (counts.passed) parts.push(counts.passed + " passed")
   if (counts.started) parts.push(counts.started + " running")
   var failed = counts.failed > 0
+  var icon = failed ? "\u274c" : (counts.passed ? "\u2705" : "\u23f3")
   return [{
     urgency: failed ? "critical" : "normal",
     timeoutMs: failed ? 0 : 8000,
-    title: (failed ? "❌" : "✅") + " CI on " + events.length + " pull requests",
+    title: icon + " CI on " + events.length + " pull requests",
     body: parts.join(" · ")
   }]
 }
@@ -284,15 +293,11 @@ function parseViewer(text) {
   try {
     data = JSON.parse(text)
   } catch (parseError) {
-    return { login: "", avatarUrl: "" }
+    return { avatarUrl: "" }
   }
   var viewer = data && data.data && data.data.viewer ? data.data.viewer : null
-  var login = viewer ? String(viewer.login || "") : ""
   var avatarUrl = viewer ? String(viewer.avatarUrl || "") : ""
-  return {
-    login: LOGIN.test(login) ? login : "",
-    avatarUrl: AVATAR_URL.test(avatarUrl) ? avatarUrl : ""
-  }
+  return { avatarUrl: AVATAR_URL.test(avatarUrl) ? avatarUrl : "" }
 }
 
 function repositoryUrl(manifest) {
