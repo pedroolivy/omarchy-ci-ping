@@ -330,11 +330,6 @@ function parseStarred(text) {
   return project && typeof project.viewerHasStarred === "boolean" ? project.viewerHasStarred : null
 }
 
-function starPath(projectUrl) {
-  var parts = repoParts(projectUrl)
-  return parts ? "/user/starred/" + parts.owner + "/" + parts.name : ""
-}
-
 function isPullUrl(url) {
   return PR_URL.test(String(url || ""))
 }

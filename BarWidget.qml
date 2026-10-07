@@ -73,31 +73,21 @@ Panel {
   readonly property string projectUrl: service ? service.projectUrl : ""
   property string starPhase: "idle"
 
+  readonly property bool starPromptDone: root.setting("starPromptDone", false) === true
+
   function giveStar() {
-    if (!root.service || root.starPhase !== "idle") return
-    root.starPhase = "sending"
-    if (!root.service.starProject()) {
-      root.starPhase = "idle"
-      root.openLink(root.projectUrl)
-    }
+    if (root.projectUrl === "" || root.starPhase !== "idle") return
+    root.starPhase = "thanks"
+    root.settings = Object.assign({}, root.settings, { starPromptDone: true })
+    if (root.bar && root.bar.shell) root.bar.shell.updateEntryInline(root.moduleName, root.settings)
+    thanksAnimation.restart()
   }
 
-  Connections {
-    target: root.service
-    function onProjectStarredChanged() {
-      if (root.service.projectStarred === false && root.starPhase === "done") root.starPhase = "idle"
-    }
-    function onStarFinished(starred) {
-      if (root.starPhase !== "sending") return
-      if (starred) {
-        root.starPhase = "thanks"
-        thanksAnimation.restart()
-      } else {
-        root.starPhase = "idle"
-        root.openLink(root.projectUrl)
-      }
-    }
+  function openProjectPage() {
+    if (root.service) root.service.openLink(root.projectUrl)
+    else Util.execArgv(["xdg-open", root.projectUrl])
   }
+
   readonly property string avatarUrl: service && service.viewer ? service.viewer.avatarUrl : ""
   readonly property bool pingsOn: root.setting("notify", true) !== false
 
@@ -601,8 +591,8 @@ Panel {
         Item {
           id: starArea
           property real sparkProgress: 0
-          visible: root.projectUrl !== "" && (root.starPhase === "sending" || root.starPhase === "thanks"
-            || (root.starPhase === "idle" && root.service !== null && root.service.projectStarred === false))
+          visible: root.projectUrl !== "" && (root.starPhase === "thanks"
+            || (root.starPhase === "idle" && !root.starPromptDone && root.service !== null && root.service.projectStarred === false))
           anchors.horizontalCenter: parent.horizontalCenter
           anchors.verticalCenter: parent.verticalCenter
           width: Math.max(starButton.implicitWidth, thanksRow.implicitWidth)
@@ -610,12 +600,11 @@ Panel {
 
           Text {
             id: starButton
-            visible: root.starPhase === "idle" || root.starPhase === "sending"
+            visible: root.starPhase === "idle"
             anchors.centerIn: parent
             textFormat: Text.PlainText
-            text: root.starPhase === "sending" ? " Starring…" : " Star on GitHub"
+            text: " Star on GitHub"
             color: starHover.hovered && root.starPhase === "idle" ? root.yellow : Color.muted
-            opacity: root.starPhase === "sending" ? 0.6 : 1
             font.family: Style.font.family
             font.pixelSize: Style.font.caption
 
@@ -653,7 +642,7 @@ Panel {
               id: thanksText
               anchors.verticalCenter: parent.verticalCenter
               textFormat: Text.PlainText
-              text: "Thanks for the star!"
+              text: "Thanks for checking it out!"
               color: Color.popups.text
               font.family: Style.font.family
               font.pixelSize: Style.font.caption
@@ -721,7 +710,9 @@ Panel {
               NumberAnimation { target: thanksHeart; property: "scale"; to: 1.3; duration: 200; easing.type: Easing.OutBack }
             }
             NumberAnimation { target: thanksHeart; property: "scale"; to: 1; duration: 160 }
-            PauseAnimation { duration: 2200 }
+            PauseAnimation { duration: 500 }
+            ScriptAction { script: root.openProjectPage() }
+            PauseAnimation { duration: 1700 }
             NumberAnimation { target: thanksRow; property: "opacity"; to: 0; duration: 450 }
             ScriptAction { script: root.starPhase = "done" }
           }
